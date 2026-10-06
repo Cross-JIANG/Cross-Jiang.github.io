@@ -1,0 +1,2350 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cross网站导航 | 分类卡片 + 实时搜索</title>
+  <meta name="description" content="按分类整理的常用网站导航，支持实时搜索、逐行结果展示、分类折叠与网站详情页。">
+
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('nav-theme') ||
+          (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
+
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --bg-alt: #eef2f8;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --accent: #2563eb;
+      --accent-soft: rgba(37, 99, 235, .1);
+      --on-accent: #ffffff;
+      --radius: 16px;
+      --shadow-sm: 0 1px 2px rgb(15 23 42 / .06);
+      --shadow: 0 20px 40px -24px rgb(15 23 42 / .4);
+      --max: 1180px;
+      --header-h: 66px;
+    }
+
+    [data-theme="dark"] {
+      --bg: #0a0f1c;
+      --bg-alt: #0e1526;
+      --surface: #121a2c;
+      --text: #e8eefb;
+      --muted: #93a2b8;
+      --line: #1f2b44;
+      --accent: #60a5fa;
+      --accent-soft: rgba(96, 165, 250, .15);
+      --on-accent: #071022;
+      --shadow-sm: 0 1px 2px rgb(0 0 0 / .5);
+      --shadow: 0 22px 44px -26px rgb(0 0 0 / .95);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: calc(var(--header-h) + 20px);
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto,
+                   "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      font-size: 16px;
+      line-height: 1.65;
+      color: var(--text);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+      transition: background-color .3s ease, color .3s ease;
+    }
+
+    img { max-width: 100%; display: block; }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; }
+    ul { margin: 0; padding: 0; list-style: none; }
+    h1, h2, h3, p { margin: 0; }
+
+    [hidden] { display: none !important; }
+
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+      border-radius: 6px;
+    }
+
+    mark {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-radius: 4px;
+      padding: 0 2px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: var(--max);
+      margin-inline: auto;
+      padding-inline: 20px;
+    }
+
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 60;
+      background: var(--bg);
+      border-bottom: 1px solid transparent;
+      transition: border-color .3s, box-shadow .3s, background-color .3s;
+    }
+    .site-header.is-scrolled {
+      border-bottom-color: var(--line);
+      box-shadow: 0 1px 16px rgb(15 23 42 / .08);
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      min-height: var(--header-h);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      flex: none;
+      font-weight: 800;
+      font-size: 1.02rem;
+      letter-spacing: -.02em;
+    }
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #2563eb, #06b6d4);
+      color: #fff;
+      font-size: .8rem;
+    }
+    .brand-text { display: none; }
+    @media (min-width: 480px) { .brand-text { display: inline; } }
+
+    .search-box {
+      position: relative;
+      flex: 1;
+      max-width: 560px;
+      margin-inline: auto;
+    }
+
+    .search-form {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 5px 5px 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface);
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .search-form:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-soft);
+    }
+
+    .search-icon { flex: none; font-size: .92rem; color: var(--muted); }
+
+    #searchInput {
+      flex: 1;
+      min-width: 0;
+      padding: 7px 0;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-size: .93rem;
+      outline: none;
+    }
+    #searchInput::-webkit-search-cancel-button { display: none; }
+
+    .search-clear {
+      flex: none;
+      width: 26px;
+      height: 26px;
+      border: 0;
+      border-radius: 50%;
+      background: var(--bg-alt);
+      color: var(--muted);
+      font-size: .72rem;
+      line-height: 1;
+    }
+    .search-clear:hover { color: var(--text); }
+
+    .search-submit {
+      flex: none;
+      padding: 8px 18px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--accent);
+      color: var(--on-accent);
+      font-size: .85rem;
+      font-weight: 600;
+      transition: filter .2s, transform .2s;
+    }
+    .search-submit:hover { filter: brightness(1.08); transform: translateY(-1px); }
+
+    .suggest {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      right: 0;
+      z-index: 80;
+      max-height: min(420px, 62vh);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 6px;
+      animation: suggestIn .18s ease both;
+    }
+    @keyframes suggestIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    .suggest-item {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 9px 11px;
+      border-radius: 11px;
+      transition: background-color .15s;
+    }
+    .suggest-item:hover,
+    .suggest-item.is-active { background: var(--accent-soft); }
+
+    .suggest-icon {
+      flex: none;
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      font-size: 1rem;
+      line-height: 1;
+    }
+    .suggest-main { min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+    .suggest-name {
+      font-size: .9rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .suggest-cat {
+      flex: none;
+      font-size: .72rem;
+      color: var(--muted);
+    }
+
+    .suggest-empty {
+      padding: 16px 12px;
+      text-align: center;
+      font-size: .86rem;
+      color: var(--muted);
+    }
+
+    .icon-btn {
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: transparent;
+      color: var(--text);
+      font-size: 1.05rem;
+      line-height: 1;
+      transition: border-color .2s, transform .2s;
+    }
+    .icon-btn:hover { border-color: var(--accent); transform: translateY(-1px); }
+
+    .icon-box {
+      overflow: hidden;
+    }
+    .icon-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;   /* 保持比例，图不会被拉伸 */
+      padding: 10%;          /* 四周留白，图标不会贴边 */
+      display: block;
+    }
+
+    .home-hero {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(44px, 7vw, 84px) 0 clamp(24px, 3vw, 36px);
+    }
+    .home-hero::before {
+      content: "";
+      position: absolute;
+      inset: -60% -10% auto;
+      height: 170%;
+      background: radial-gradient(42% 52% at 50% 45%, var(--accent-soft), transparent 70%);
+      pointer-events: none;
+    }
+    .home-hero .container { position: relative; }
+
+    .eyebrow {
+      display: inline-block;
+      margin-bottom: 14px;
+      padding: 5px 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface);
+      font-size: .76rem;
+      font-weight: 600;
+      letter-spacing: .06em;
+      color: var(--muted);
+    }
+
+    .home-hero h1 {
+      font-size: clamp(1.7rem, 4.4vw, 2.7rem);
+      line-height: 1.18;
+      letter-spacing: -.035em;
+      margin-bottom: 14px;
+    }
+
+    .home-hero .lead {
+      max-width: 62ch;
+      font-size: clamp(.95rem, 1.4vw, 1.04rem);
+      color: var(--muted);
+    }
+
+    .cat-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 26px;
+    }
+    .cat-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 15px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: .85rem;
+      font-weight: 600;
+      transition: all .2s ease;
+    }
+    .cat-chip:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
+    .cat-chip span {
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: var(--bg-alt);
+      font-size: .72rem;
+      font-weight: 700;
+    }
+
+    .cat-section { padding: clamp(26px, 3.4vw, 40px) 0; }
+
+    .cat-section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .cat-section-head h2 {
+      font-size: clamp(1.1rem, 2vw, 1.35rem);
+      letter-spacing: -.02em;
+    }
+
+    .cat-head-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: none;
+    }
+
+    .cat-count { font-size: .82rem; color: var(--muted); }
+
+    .cat-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: .82rem;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: border-color .2s, color .2s, transform .2s, background-color .2s;
+    }
+    .cat-toggle:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateY(-1px);
+    }
+    .cat-toggle .chev {
+      font-size: .68rem;
+      line-height: 1;
+      transition: transform .3s ease;
+    }
+    .cat-toggle[aria-expanded="true"] .chev { transform: rotate(180deg); }
+
+    .site-grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      transition: max-height .45s cubic-bezier(.4, 0, .2, 1);
+    }
+    .site-grid.is-collapsed { overflow: hidden; }
+
+    .site-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 13px;
+      padding: 15px 16px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--surface);
+      box-shadow: var(--shadow-sm);
+      transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
+    }
+    .site-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent);
+      box-shadow: var(--shadow);
+    }
+
+    .site-icon {
+      flex: none;
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      font-size: 1.3rem;
+      line-height: 1;
+      box-shadow: inset 0 0 0 1px rgb(255 255 255 / .16);
+    }
+
+    .site-body { min-width: 0; display: grid; gap: 3px; }
+
+    .site-name {
+      font-size: .95rem;
+      font-weight: 700;
+      letter-spacing: -.01em;
+    }
+    .site-desc {
+      font-size: .82rem;
+      line-height: 1.55;
+      color: var(--muted);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .search-view { padding: clamp(28px, 4vw, 48px) 0 clamp(48px, 6vw, 76px); }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 20px;
+      font-size: .86rem;
+      font-weight: 600;
+      color: var(--muted);
+      transition: color .2s, gap .2s;
+    }
+    .back-link:hover { color: var(--accent); gap: 10px; }
+
+    .search-head { margin-bottom: 26px; }
+    .search-head h1 {
+      font-size: clamp(1.4rem, 3.2vw, 2rem);
+      letter-spacing: -.03em;
+      margin-bottom: 6px;
+    }
+    .search-meta { font-size: .9rem; color: var(--muted); }
+    .search-meta strong { color: var(--accent); }
+
+    .result-list { display: grid; gap: 12px; }
+
+    .result-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 15px 18px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--surface);
+      box-shadow: var(--shadow-sm);
+      opacity: 0;
+      transform: translateY(14px);
+      transition: opacity .5s ease,
+                  transform .5s cubic-bezier(.22, .61, .36, 1),
+                  border-color .2s ease,
+                  box-shadow .25s ease;
+    }
+    .result-row.is-in { opacity: 1; transform: none; }
+    .result-row:hover {
+      border-color: var(--accent);
+      box-shadow: var(--shadow);
+    }
+
+    .result-icon {
+      flex: none;
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      border-radius: 13px;
+      font-size: 1.3rem;
+      line-height: 1;
+    }
+
+    .result-body { min-width: 0; flex: 1; display: grid; gap: 3px; }
+
+    .result-top { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+    .result-name { font-size: 1rem; font-weight: 700; letter-spacing: -.01em; }
+    .result-cat {
+      padding: 2px 9px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: .72rem;
+      font-weight: 700;
+    }
+    .result-desc {
+      font-size: .85rem;
+      line-height: 1.6;
+      color: var(--muted);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .result-arrow {
+      flex: none;
+      font-size: .95rem;
+      color: var(--muted);
+      transition: color .2s, transform .25s;
+    }
+    .result-row:hover .result-arrow {
+      color: var(--accent);
+      transform: translate(3px, -3px);
+    }
+
+    .empty-state {
+      padding: clamp(48px, 9vw, 90px) 20px;
+      text-align: center;
+    }
+    .empty-icon {
+      font-size: 2.4rem;
+      margin-bottom: 12px;
+      opacity: .55;
+    }
+    .empty-state h3 { font-size: 1.1rem; margin-bottom: 6px; }
+    .empty-state p { font-size: .9rem; color: var(--muted); }
+
+    .detail-view { padding: clamp(28px, 4vw, 48px) 0 clamp(48px, 6vw, 76px); }
+
+    .detail-card {
+      padding: clamp(24px, 4.5vw, 44px);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--surface);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .detail-head {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .detail-icon {
+      flex: none;
+      width: 72px;
+      height: 72px;
+      display: grid;
+      place-items: center;
+      border-radius: 20px;
+      font-size: 2.1rem;
+      line-height: 1;
+      box-shadow: inset 0 0 0 1px rgb(255 255 255 / .18);
+    }
+
+    .detail-head h1 {
+      font-size: clamp(1.5rem, 3.4vw, 2.05rem);
+      letter-spacing: -.03em;
+      line-height: 1.2;
+      margin-bottom: 8px;
+    }
+
+    .tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag {
+      padding: 3px 11px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: .73rem;
+      font-weight: 700;
+    }
+    .tag-soft { background: var(--bg-alt); color: var(--muted); }
+
+    .detail-desc {
+      font-size: clamp(.94rem, 1.4vw, 1.02rem);
+      line-height: 1.8;
+      color: var(--muted);
+      max-width: 68ch;
+      margin-bottom: 26px;
+    }
+
+    .detail-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 11px 22px;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      font-size: .9rem;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: background-color .2s, color .2s, border-color .2s,
+                  transform .2s, box-shadow .2s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: var(--on-accent);
+      box-shadow: 0 8px 20px -10px var(--accent);
+    }
+    .btn-primary:hover { transform: translateY(-2px); filter: brightness(1.08); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text);
+      border-color: var(--line);
+    }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
+
+    .copy-tip {
+      font-size: .82rem;
+      font-weight: 600;
+      color: #059669;
+      opacity: 0;
+      transition: opacity .25s;
+    }
+    .copy-tip.is-show { opacity: 1; }
+
+    .detail-url {
+      display: inline-block;
+      padding: 8px 14px;
+      border-radius: 10px;
+      background: var(--bg-alt);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .82rem;
+      color: var(--muted);
+      word-break: break-all;
+    }
+
+    .related { margin-top: clamp(32px, 5vw, 52px); }
+    .related h2 {
+      font-size: clamp(1.05rem, 2vw, 1.25rem);
+      letter-spacing: -.02em;
+      margin-bottom: 16px;
+    }
+
+    .site-footer {
+      padding: 36px 0 28px;
+      background: var(--bg-alt);
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: .86rem;
+    }
+    .footer-inner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px 24px;
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity .55s ease, transform .55s cubic-bezier(.22, .61, .36, 1);
+      will-change: opacity, transform;
+    }
+    .reveal.is-visible { opacity: 1; transform: none; }
+
+    @media (max-width: 900px) {
+      .header-inner {
+        flex-wrap: wrap;
+        gap: 10px;
+        padding-block: 10px;
+      }
+      .search-box { order: 5; flex: 1 1 100%; max-width: none; }
+    }
+
+    @media (max-width: 640px) {
+      .cat-section-head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .cat-head-right { width: 100%; justify-content: space-between; }
+    }
+
+    @media (max-width: 560px) {
+      .search-submit { padding: 8px 14px; }
+      .site-grid { grid-template-columns: 1fr; }
+      .result-row { padding: 13px 14px; gap: 12px; }
+      .result-icon { width: 40px; height: 40px; font-size: 1.1rem; }
+      .detail-icon { width: 60px; height: 60px; font-size: 1.7rem; border-radius: 16px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        transition-duration: .01ms !important;
+      }
+      .reveal { opacity: 1; transform: none; }
+      .result-row { opacity: 1; transform: none; }
+      .site-grid { transition: none; }
+    }
+  </style>
+</head>
+
+<body>
+  <a href="#main"
+     style="position:absolute;left:-9999px;top:8px;z-index:100"
+     onfocus="this.style.left='8px'" onblur="this.style.left='-9999px'"
+     class="tag">跳到主内容</a>
+
+  <header class="site-header" id="siteHeader">
+    <div class="container header-inner">
+      <a class="brand" href="#/">
+        <span class="brand-mark" aria-hidden="true">◈</span>
+        <span class="brand-text">Cross网站导航</span>
+      </a>
+
+      <div class="search-box" id="searchBox">
+        <form class="search-form" id="searchForm" role="search" autocomplete="off">
+          <span class="search-icon" aria-hidden="true">🔍</span>
+          <input id="searchInput" type="search" name="q"
+                 placeholder="搜索网站名称、分类或关键词…"
+                 aria-label="搜索网站" aria-expanded="false"
+                 aria-controls="suggest" autocomplete="off">
+          <button class="search-clear" id="searchClear" type="button"
+                  aria-label="清空搜索" hidden>✕</button>
+          <button class="search-submit" type="submit">搜索</button>
+        </form>
+        <div class="suggest" id="suggest" role="listbox" aria-label="搜索建议" hidden></div>
+      </div>
+
+      <button class="icon-btn" id="themeToggle" type="button"
+              aria-label="切换深色 / 浅色主题">🌙</button>
+    </div>
+  </header>
+
+  <main id="main">
+    <div id="viewRoot"></div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>© <span id="year">2026</span> Cross网站导航</span>
+      <span>Cross & SAKANAthree</span>
+    </div>
+  </footer>
+
+  <script>
+  (function () {
+    'use strict';
+
+    /* =========================================================
+       1. 数据源
+       ========================================================= */
+    const CATEGORY_ORDER = [
+      '开发工具', '设计资源', 'AI 工具', '学习平台', '效率办公', '影音娱乐', '社交媒体'
+    ];
+
+    const SITES = [
+      /* ================= 开发工具 ================= */
+      { id:'github', name:'GitHub', url:'https://github.com', icon:'🐙', img:'icons/github.svg', 
+        color:['#24292f','#6e7681'], cat:'开发工具', tags:['代码','开源','Git'],
+        desc:'全球最大的代码托管平台，支持 Git 仓库、Issue、Actions 与团队协作。' },
+      { id:'gitlab', name:'GitLab', url:'https://gitlab.com', icon:'🦊',
+        color:['#fc6d26','#e24329'], cat:'开发工具', tags:['代码','CI/CD','DevOps'],
+        desc:'一体化 DevOps 平台，内置代码托管、CI/CD、容器镜像与项目管理。' },
+      { id:'bitbucket', name:'Bitbucket', url:'https://bitbucket.org', icon:'🪣',
+        color:['#0052cc','#2684ff'], cat:'开发工具', tags:['代码','Atlassian','Git'],
+        desc:'Atlassian 旗下的代码托管服务，与 Jira、Trello 无缝集成。' },
+      { id:'gitee', name:'Gitee 码云', url:'https://gitee.com', icon:'🇨🇳',
+        color:['#c71d23','#e74c3c'], cat:'开发工具', tags:['代码','国内','Git'],
+        desc:'国内代码托管平台，访问速度快，适合国内团队协作与开源项目。' },
+      { id:'stackoverflow', name:'Stack Overflow', url:'https://stackoverflow.com', icon:'📚',
+        color:['#f48024','#ffb86c'], cat:'开发工具', tags:['问答','编程','社区'],
+        desc:'程序员问答社区，几乎所有技术问题都能在这里找到高票答案。' },
+      { id:'mdn', name:'MDN Web Docs', url:'https://developer.mozilla.org', icon:'📖',
+        color:['#0b5fff','#4f9bff'], cat:'开发工具', tags:['文档','Web','前端'],
+        desc:'Mozilla 维护的 Web 技术权威文档，前端开发者的日常必备参考。' },
+      { id:'devdocs', name:'DevDocs', url:'https://devdocs.io', icon:'🗂️',
+        color:['#1f2937','#4b5563'], cat:'开发工具', tags:['文档','聚合','离线'],
+        desc:'把上百种技术文档聚合在一个界面，支持离线与快捷搜索。' },
+      { id:'codepen', name:'CodePen', url:'https://codepen.io', icon:'🖊️',
+        color:['#1f2937','#4b5563'], cat:'开发工具', tags:['在线编辑','前端','演示'],
+        desc:'在线前端代码演示平台，写 HTML/CSS/JS 片段并即时预览效果。' },
+      { id:'codesandbox', name:'CodeSandbox', url:'https://codesandbox.io', icon:'📦',
+        color:['#151515','#4b5563'], cat:'开发工具', tags:['在线IDE','前端','协作'],
+        desc:'浏览器里的完整开发环境，支持 React、Vue 等框架的在线运行与分享。' },
+      { id:'stackblitz', name:'StackBlitz', url:'https://stackblitz.com', icon:'⚡',
+        color:['#1389fd','#4fa8ff'], cat:'开发工具', tags:['在线IDE','Node','Web'],
+        desc:'基于 WebContainers 的在线 IDE，可在浏览器内运行完整 Node.js 项目。' },
+      { id:'replit', name:'Replit', url:'https://replit.com', icon:'🌀',
+        color:['#f26207','#ff9f43'], cat:'开发工具', tags:['在线IDE','协作','多语言'],
+        desc:'浏览器里的云端开发环境，无需配置即可编写、运行并分享项目。' },
+      { id:'gitpod', name:'Gitpod', url:'https://www.gitpod.io', icon:'☁️',
+        color:['#ffb45b','#ff8a00'], cat:'开发工具', tags:['云端IDE','自动化','Git'],
+        desc:'为代码仓库自动生成云端开发环境，打开链接即可开始编码。' },
+      { id:'codespaces', name:'GitHub Codespaces', url:'https://github.com/features/codespaces', icon:'🧑‍💻',
+        color:['#24292f','#57606a'], cat:'开发工具', tags:['云端IDE','GitHub','VSCode'],
+        desc:'GitHub 提供的云端开发环境，浏览器或 VS Code 中一键启动。' },
+      { id:'npm', name:'npm', url:'https://www.npmjs.com', icon:'📦',
+        color:['#cb3837','#ff6b6b'], cat:'开发工具', tags:['包管理','Node','依赖'],
+        desc:'JavaScript 世界最大的包管理器与模块仓库，前端工程化的基础设施。' },
+      { id:'pnpm', name:'pnpm', url:'https://pnpm.io', icon:'⚡',
+        color:['#f69220','#ffb86c'], cat:'开发工具', tags:['包管理','Node','性能'],
+        desc:'以硬链接与内容寻址存储著称的包管理器，安装快、省磁盘。' },
+      { id:'yarn', name:'Yarn', url:'https://yarnpkg.com', icon:'🧶',
+        color:['#2188b6','#4aa8d8'], cat:'开发工具', tags:['包管理','Node','依赖'],
+        desc:'Facebook 推出的 JavaScript 包管理器，以确定性与速度见长。' },
+      { id:'vercel', name:'Vercel', url:'https://vercel.com', icon:'▲',
+        color:['#000000','#4b5563'], cat:'开发工具', tags:['部署','前端','托管'],
+        desc:'面向前端的一键部署平台，与 Git 仓库联动，推送即上线。' },
+      { id:'netlify', name:'Netlify', url:'https://www.netlify.com', icon:'🌐',
+        color:['#00c7b7','#3ce0d1'], cat:'开发工具', tags:['部署','静态','托管'],
+        desc:'静态网站与 Jamstack 应用托管平台，自带 CDN、表单与函数能力。' },
+      { id:'cloudflare', name:'Cloudflare', url:'https://www.cloudflare.com', icon:'🛡️',
+        color:['#f38020','#fca444'], cat:'开发工具', tags:['CDN','DNS','安全'],
+        desc:'全球 CDN、DNS 与安全防护服务，Pages 与 Workers 也深受开发者喜爱。' },
+      { id:'railway', name:'Railway', url:'https://railway.app', icon:'🚂',
+        color:['#13111c','#5c4d7d'], cat:'开发工具', tags:['部署','后端','数据库'],
+        desc:'现代化的应用部署平台，支持数据库、后端服务与自动化部署。' },
+      { id:'render', name:'Render', url:'https://render.com', icon:'🌥️',
+        color:['#46e3b7','#2ebd98'], cat:'开发工具', tags:['部署','全栈','托管'],
+        desc:'一站式云托管平台，支持 Web 服务、数据库、定时任务与静态站点。' },
+      { id:'fly', name:'Fly.io', url:'https://fly.io', icon:'🎈',
+        color:['#8b5cf6','#a78bfa'], cat:'开发工具', tags:['部署','边缘','容器'],
+        desc:'把应用部署到全球边缘节点，适合低延迟服务与容器化应用。' },
+      { id:'supabase', name:'Supabase', url:'https://supabase.com', icon:'⚡',
+        color:['#3ecf8e','#2db574'], cat:'开发工具', tags:['后端','数据库','开源'],
+        desc:'开源版 Firebase 替代品，提供 Postgres、认证、存储与实时订阅。' },
+      { id:'firebase', name:'Firebase', url:'https://firebase.google.com', icon:'🔥',
+        color:['#ffca28','#ffa000'], cat:'开发工具', tags:['后端','Google','实时'],
+        desc:'Google 的移动与 Web 应用开发平台，认证、数据库、托管一应俱全。' },
+
+      /* --- 语言与 IDE --- */
+      { id:'python', name:'Python', url:'https://www.python.org', icon:'🐍',
+        color:['#3776ab','#ffd43b'], cat:'开发工具', tags:['语言','后端','脚本'],
+        desc:'通用高级编程语言，语法简洁，广泛用于数据科学、人工智能与自动化脚本。' },
+      { id:'pycharm', name:'PyCharm', url:'https://www.jetbrains.com/pycharm/', icon:'🅿️',
+        color:['#21d789','#0fbf71'], cat:'开发工具', tags:['IDE','Python','JetBrains'],
+        desc:'JetBrains 出品的 Python 集成开发环境，智能补全与调试体验出色。' },
+      { id:'jupyter', name:'Jupyter', url:'https://jupyter.org', icon:'📓',
+        color:['#f37626','#ff9d5c'], cat:'开发工具', tags:['笔记本','数据科学','Python'],
+        desc:'交互式计算笔记本，边写代码边出结果，是数据分析的标准工具。' },
+      { id:'anaconda', name:'Anaconda', url:'https://www.anaconda.com', icon:'🐍',
+        color:['#44a340','#6ed16a'], cat:'开发工具', tags:['环境','数据科学','Python'],
+        desc:'Python 数据科学发行版，预装常用库并提供 conda 环境管理。' },
+      { id:'trae', name:'Trae', url:'https://www.trae.ai', icon:'🤖',
+        color:['#1e3a8a','#3b82f6'], cat:'开发工具', tags:['AI IDE','字节','编程'],
+        desc:'字节跳动推出的 AI 原生编程 IDE，内置智能体可辅助生成与重构代码。' },
+      { id:'cursor', name:'Cursor', url:'https://cursor.com', icon:'🖱️',
+        color:['#0f172a','#475569'], cat:'开发工具', tags:['AI IDE','编辑器','重构'],
+        desc:'深度集成 AI 的代码编辑器，支持整库问答、多文件编辑与自动补全。' },
+      { id:'vscode', name:'VS Code', url:'https://code.visualstudio.com', icon:'🆚',
+        color:['#007acc','#22a6f2'], cat:'开发工具', tags:['编辑器','插件','微软'],
+        desc:'微软出品的轻量代码编辑器，插件生态丰富，前端与脚本开发首选。' },
+      { id:'visualstudio', name:'Visual Studio', url:'https://visualstudio.microsoft.com', icon:'🟣',
+        color:['#5c2d91','#8b5cf6'], cat:'开发工具', tags:['IDE','微软','.NET'],
+        desc:'微软的重量级集成开发环境，适合 .NET、C# 与 Windows 桌面开发。' },
+      { id:'sublime', name:'Sublime Text', url:'https://www.sublimetext.com', icon:'🟧',
+        color:['#ff9800','#ffb74d'], cat:'开发工具', tags:['编辑器','轻量','快捷'],
+        desc:'以启动快、响应快著称的代码编辑器，深受老牌开发者喜爱。' },
+      { id:'vim', name:'Vim', url:'https://www.vim.org', icon:'💚',
+        color:['#019833','#26b04a'], cat:'开发工具', tags:['编辑器','终端','快捷键'],
+        desc:'经典的终端文本编辑器，模式化编辑与高效键盘操作的代表。' },
+      { id:'neovim', name:'Neovim', url:'https://neovim.io', icon:'🌿',
+        color:['#57a143','#7bc46e'], cat:'开发工具', tags:['编辑器','终端','Lua'],
+        desc:'Vim 的现代化重构版本，内置 LSP 与 Lua 配置，扩展性更强。' },
+      { id:'webstorm', name:'WebStorm', url:'https://www.jetbrains.com/webstorm/', icon:'🌊',
+        color:['#00cdd7','#07c3f2'], cat:'开发工具', tags:['IDE','前端','JetBrains'],
+        desc:'JetBrains 的前端 IDE，对 JavaScript、TypeScript 与框架支持极佳。' },
+      { id:'phpstorm', name:'PhpStorm', url:'https://www.jetbrains.com/phpstorm/', icon:'🐘',
+        color:['#b45cf0','#d78bfa'], cat:'开发工具', tags:['IDE','PHP','JetBrains'],
+        desc:'JetBrains 的 PHP 集成开发环境，对框架与调试支持完善。' },
+      { id:'goland', name:'GoLand', url:'https://www.jetbrains.com/go/', icon:'🐹',
+        color:['#00acd7','#4dd0e1'], cat:'开发工具', tags:['IDE','Go','JetBrains'],
+        desc:'JetBrains 的 Go 语言 IDE，重构、调试与测试工具链完整。' },
+      { id:'xcode', name:'Xcode', url:'https://developer.apple.com/xcode/', icon:'🍎',
+        color:['#147efb','#5aa9ff'], cat:'开发工具', tags:['IDE','iOS','Apple'],
+        desc:'苹果官方的开发工具，用于构建 iOS、iPadOS 与 macOS 应用。' },
+      { id:'androidstudio', name:'Android Studio', url:'https://developer.android.com/studio', icon:'🤖',
+        color:['#3ddc84','#0f9d58'], cat:'开发工具', tags:['Android','IDE','Google'],
+        desc:'Google 官方的 Android 开发工具，集成模拟器、调试与性能分析。' },
+      { id:'unity', name:'Unity', url:'https://unity.com', icon:'🎮',
+        color:['#222c37','#4b5563'], cat:'开发工具', tags:['游戏引擎','3D','跨平台'],
+        desc:'主流游戏引擎，支持 2D/3D 开发，可发布到移动、桌面与主机平台。' },
+      { id:'unreal', name:'Unreal Engine', url:'https://www.unrealengine.com', icon:'🎬',
+        color:['#0e1128','#31363f'], cat:'开发工具', tags:['游戏引擎','3D','Epic'],
+        desc:'Epic 的高保真游戏引擎，广泛用于 3A 游戏、影视与虚拟制作。' },
+      { id:'godot', name:'Godot', url:'https://godotengine.org', icon:'🤖',
+        color:['#478cbf','#6aa9d6'], cat:'开发工具', tags:['游戏引擎','开源','轻量'],
+        desc:'开源免费的游戏引擎，体积小、上手快，社区活跃。' },
+
+      /* --- Web 框架与语言 --- */
+      { id:'html', name:'HTML', url:'https://developer.mozilla.org/zh-CN/docs/Web/HTML', icon:'🧱',
+        color:['#e34f26','#f5793b'], cat:'开发工具', tags:['前端','标记语言','Web'],
+        desc:'超文本标记语言，用来描述网页的结构与内容，是 Web 的基石。' },
+      { id:'css', name:'CSS', url:'https://developer.mozilla.org/zh-CN/docs/Web/CSS', icon:'🎀',
+        color:['#264de4','#5b7bff'], cat:'开发工具', tags:['前端','样式','Web'],
+        desc:'层叠样式表，负责网页的布局、配色与动画表现。' },
+      { id:'javascript', name:'JavaScript', url:'https://developer.mozilla.org/zh-CN/docs/Web/JavaScript', icon:'🟨',
+        color:['#f7df1e','#f0b400'], cat:'开发工具', tags:['前端','脚本','Web'],
+        desc:'Web 的脚本语言，如今也广泛用于服务端、桌面与移动端开发。' },
+      { id:'typescript', name:'TypeScript', url:'https://www.typescriptlang.org', icon:'🔷',
+        color:['#3178c6','#5a9ee0'], cat:'开发工具', tags:['语言','类型','微软'],
+        desc:'JavaScript 的类型化超集，为大型前端项目提供静态类型保障。' },
+      { id:'nodejs', name:'Node.js', url:'https://nodejs.org', icon:'🟢',
+        color:['#339933','#5bbf5b'], cat:'开发工具', tags:['运行时','后端','JavaScript'],
+        desc:'基于 V8 的 JavaScript 运行时，让 JS 可以运行在服务端与工具链中。' },
+      { id:'deno', name:'Deno', url:'https://deno.com', icon:'🦕',
+        color:['#000000','#4b5563'], cat:'开发工具', tags:['运行时','安全','TypeScript'],
+        desc:'Node.js 作者打造的现代运行时，默认安全，原生支持 TypeScript。' },
+      { id:'bun', name:'Bun', url:'https://bun.sh', icon:'🥟',
+        color:['#fbf0df','#f472b6'], cat:'开发工具', tags:['运行时','快速','打包'],
+        desc:'集运行时、打包器与包管理于一体的新工具，启动速度极快。' },
+      { id:'react', name:'React', url:'https://react.dev', icon:'⚛️',
+        color:['#61dafb','#21a1c4'], cat:'开发工具', tags:['前端','组件','Meta'],
+        desc:'Meta 推出的 UI 库，以组件化与声明式渲染改变前端开发方式。' },
+      { id:'vue', name:'Vue.js', url:'https://vuejs.org', icon:'💚',
+        color:['#41b883','#35495e'], cat:'开发工具', tags:['前端','框架','国产'],
+        desc:'渐进式 JavaScript 框架，上手友好，中文社区活跃。' },
+      { id:'angular', name:'Angular', url:'https://angular.dev', icon:'🅰️',
+        color:['#dd0031','#f0506e'], cat:'开发工具', tags:['前端','框架','Google'],
+        desc:'Google 的企业级前端框架，内置依赖注入、路由与表单方案。' },
+      { id:'svelte', name:'Svelte', url:'https://svelte.dev', icon:'🔥',
+        color:['#ff3e00','#ff7a4d'], cat:'开发工具', tags:['前端','编译','轻量'],
+        desc:'编译时框架，将组件编译为高效的原生 JS，运行时开销极小。' },
+      { id:'nextjs', name:'Next.js', url:'https://nextjs.org', icon:'▲',
+        color:['#000000','#4b5563'], cat:'开发工具', tags:['框架','React','SSR'],
+        desc:'基于 React 的全栈框架，支持服务端渲染、静态生成与 API 路由。' },
+      { id:'nuxt', name:'Nuxt', url:'https://nuxt.com', icon:'💚',
+        color:['#00dc82','#00b06b'], cat:'开发工具', tags:['框架','Vue','SSR'],
+        desc:'Vue 生态的全栈框架，约定优于配置，SEO 与性能表现良好。' },
+      { id:'astro', name:'Astro', url:'https://astro.build', icon:'🚀',
+        color:['#ff5d01','#ff8a3d'], cat:'开发工具', tags:['框架','静态','内容'],
+        desc:'面向内容站点的框架，默认零 JS，可与 React、Vue 等混用。' },
+      { id:'remix', name:'Remix', url:'https://remix.run', icon:'💿',
+        color:['#121212','#4b5563'], cat:'开发工具', tags:['框架','React','全栈'],
+        desc:'以 Web 标准为核心的全栈 React 框架，表单与数据加载体验优秀。' },
+      { id:'tailwind', name:'Tailwind CSS', url:'https://tailwindcss.com', icon:'🎐',
+        color:['#06b6d4','#38bdf8'], cat:'开发工具', tags:['CSS','原子化','实用类'],
+        desc:'原子化 CSS 框架，用类名直接组合样式，避免维护大量自定义 CSS。' },
+      { id:'bootstrap', name:'Bootstrap', url:'https://getbootstrap.com', icon:'🅱️',
+        color:['#7952b3','#9b7dd4'], cat:'开发工具', tags:['CSS','组件','响应式'],
+        desc:'经典的前端组件库，栅格系统与组件样式成熟，适合快速搭建页面。' },
+      { id:'vite', name:'Vite', url:'https://vitejs.dev', icon:'⚡',
+        color:['#646cff','#a78bfa'], cat:'开发工具', tags:['构建','快速','前端'],
+        desc:'基于 ESM 的新一代前端构建工具，开发服务器启动几乎瞬时。' },
+      { id:'webpack', name:'webpack', url:'https://webpack.js.org', icon:'📦',
+        color:['#1c78c0','#4a9fe0'], cat:'开发工具', tags:['构建','打包','模块'],
+        desc:'老牌模块打包器，生态庞大，配置灵活但学习曲线较陡。' },
+
+      /* --- 数据库与后端 --- */
+      { id:'mysql', name:'MySQL', url:'https://www.mysql.com', icon:'🐬',
+        color:['#00758f','#00a3c4'], cat:'开发工具', tags:['数据库','关系型','SQL'],
+        desc:'全球使用最广泛的开源关系型数据库，Web 应用后端常青树。' },
+      { id:'postgresql', name:'PostgreSQL', url:'https://www.postgresql.org', icon:'🐘',
+        color:['#336791','#5b8bb5'], cat:'开发工具', tags:['数据库','关系型','开源'],
+        desc:'功能强大的开源对象关系型数据库，扩展性与 SQL 标准支持优秀。' },
+      { id:'mongodb', name:'MongoDB', url:'https://www.mongodb.com', icon:'🍃',
+        color:['#00ed64','#13aa52'], cat:'开发工具', tags:['数据库','文档','NoSQL'],
+        desc:'面向文档的 NoSQL 数据库，以灵活的 JSON 式结构著称。' },
+      { id:'redis', name:'Redis', url:'https://redis.io', icon:'🔴',
+        color:['#dc382d','#ff6b5b'], cat:'开发工具', tags:['数据库','缓存','内存'],
+        desc:'高性能内存键值数据库，常用于缓存、队列与实时排行榜。' },
+      { id:'sqlite', name:'SQLite', url:'https://www.sqlite.org', icon:'🪶',
+        color:['#003b57','#0f6b93'], cat:'开发工具', tags:['数据库','嵌入式','轻量'],
+        desc:'零配置的嵌入式数据库，单文件存储，广泛用于移动端与桌面应用。' },
+      { id:'docker', name:'Docker', url:'https://www.docker.com', icon:'🐳',
+        color:['#2496ed','#4fb0ff'], cat:'开发工具', tags:['容器','部署','DevOps'],
+        desc:'容器化平台，把应用与依赖打包成镜像，实现一致的运行环境。' },
+      { id:'kubernetes', name:'Kubernetes', url:'https://kubernetes.io', icon:'☸️',
+        color:['#326ce5','#5b8def'], cat:'开发工具', tags:['容器','编排','云原生'],
+        desc:'容器编排系统，负责自动化部署、扩缩容与故障恢复。' },
+      { id:'nginx', name:'Nginx', url:'https://nginx.org', icon:'🌐',
+        color:['#009639','#2eb85c'], cat:'开发工具', tags:['服务器','反向代理','高性能'],
+        desc:'高性能 Web 服务器与反向代理，静态资源与负载均衡的常用选择。' },
+      { id:'postman', name:'Postman', url:'https://www.postman.com', icon:'📮',
+        color:['#ff6c37','#ff9a6c'], cat:'开发工具', tags:['API','测试','调试'],
+        desc:'接口调试与协作平台，支持请求集合、环境变量与自动化测试。' },
+      { id:'insomnia', name:'Insomnia', url:'https://insomnia.rest', icon:'🌙',
+        color:['#4000bf','#7b5cff'], cat:'开发工具', tags:['API','REST','GraphQL'],
+        desc:'轻量优雅的 API 客户端，支持 REST、GraphQL 与 gRPC。' },
+      { id:'graphql', name:'GraphQL', url:'https://graphql.org', icon:'🔺',
+        color:['#e10098','#ff4db8'], cat:'开发工具', tags:['API','查询语言','Meta'],
+        desc:'由 Meta 提出的 API 查询语言，让客户端按需获取数据字段。' },
+      { id:'swagger', name:'Swagger', url:'https://swagger.io', icon:'📋',
+        color:['#85ea2d','#4caf50'], cat:'开发工具', tags:['API','文档','OpenAPI'],
+        desc:'OpenAPI 规范的工具链，可自动生成接口文档与客户端代码。' },
+
+      /* --- 版本控制与协作 --- */
+      { id:'git', name:'Git', url:'https://git-scm.com', icon:'🌳',
+        color:['#f05032','#ff7b5e'], cat:'开发工具', tags:['版本控制','分布式','必备'],
+        desc:'分布式版本控制系统，几乎所有现代软件开发的基础设施。' },
+      { id:'sourcetree', name:'Sourcetree', url:'https://www.sourcetreeapp.com', icon:'🌲',
+        color:['#0052cc','#2684ff'], cat:'开发工具', tags:['Git','图形界面','Atlassian'],
+        desc:'Atlassian 出品的免费 Git 图形客户端，分支可视化直观。' },
+      { id:'jira', name:'Jira', url:'https://www.atlassian.com/software/jira', icon:'📊',
+        color:['#0052cc','#2684ff'], cat:'开发工具', tags:['项目管理','敏捷','Atlassian'],
+        desc:'Atlassian 的项目与缺陷跟踪工具，敏捷开发团队的常见选择。' },
+      { id:'confluence', name:'Confluence', url:'https://www.atlassian.com/software/confluence', icon:'📘',
+        color:['#0052cc','#2684ff'], cat:'开发工具', tags:['文档','协作','知识库'],
+        desc:'团队知识协作平台，与 Jira 深度集成，适合沉淀项目文档。' },
+      { id:'linear', name:'Linear', url:'https://linear.app', icon:'📐',
+        color:['#5e6ad2','#828fff'], cat:'开发工具', tags:['项目管理','现代','快捷键'],
+        desc:'为软件团队打造的项目管理工具，速度快、交互流畅。' },
+
+      /* --- 测试与质量 --- */
+      { id:'jest', name:'Jest', url:'https://jestjs.io', icon:'🃏',
+        color:['#c21325','#e94b5e'], cat:'开发工具', tags:['测试','JavaScript','单元'],
+        desc:'Facebook 出品的 JavaScript 测试框架，开箱即用，断言与快照齐全。' },
+      { id:'vitest', name:'Vitest', url:'https://vitest.dev', icon:'⚡',
+        color:['#6da13f','#a3d977'], cat:'开发工具', tags:['测试','Vite','快速'],
+        desc:'基于 Vite 的单元测试框架，与前端工程配置无缝共享。' },
+      { id:'cypress', name:'Cypress', url:'https://www.cypress.io', icon:'🌲',
+        color:['#17202c','#4b5563'], cat:'开发工具', tags:['测试','E2E','前端'],
+        desc:'面向前端的端到端测试工具，调试体验直观，可回放每一步操作。' },
+      { id:'playwright', name:'Playwright', url:'https://playwright.dev', icon:'🎭',
+        color:['#2ead33','#45d34a'], cat:'开发工具', tags:['测试','E2E','微软'],
+        desc:'微软出品的跨浏览器自动化测试工具，支持 Chromium、Firefox 与 WebKit。' },
+      { id:'sonarqube', name:'SonarQube', url:'https://www.sonarsource.com/products/sonarqube/', icon:'🔎',
+        color:['#4e9bcd','#7ec0e8'], cat:'开发工具', tags:['代码质量','静态分析','CI'],
+        desc:'代码质量平台，持续检测漏洞、坏味道与重复代码。' },
+
+      /* --- 云服务 --- */
+      { id:'aws', name:'AWS', url:'https://aws.amazon.com', icon:'☁️',
+        color:['#ff9900','#ffb84d'], cat:'开发工具', tags:['云服务','亚马逊','基础设施'],
+        desc:'亚马逊云计算平台，全球市场份额最大，服务覆盖计算、存储与 AI。' },
+      { id:'azure', name:'Microsoft Azure', url:'https://azure.microsoft.com', icon:'🔷',
+        color:['#0078d4','#3b9ce8'], cat:'开发工具', tags:['云服务','微软','企业'],
+        desc:'微软的云计算平台，与 Windows Server、.NET 生态集成紧密。' },
+      { id:'aliyun', name:'阿里云', url:'https://www.aliyun.com', icon:'🌩️',
+        color:['#ff6a00','#ff9d4d'], cat:'开发工具', tags:['云服务','国内','阿里'],
+        desc:'国内领先的云计算服务商，提供 ECS、OSS、函数计算等全套产品。' },
+      { id:'tencentcloud', name:'腾讯云', url:'https://cloud.tencent.com', icon:'☁️',
+        color:['#006eff','#4d97ff'], cat:'开发工具', tags:['云服务','国内','腾讯'],
+        desc:'腾讯的云计算品牌，在游戏、音视频与小程序后端领域优势明显。' },
+
+      /* --- 其他开发工具 --- */
+      { id:'arduino', name:'Arduino', url:'https://www.arduino.cc', icon:'🔌',
+        color:['#00979d','#00c2cb'], cat:'开发工具', tags:['硬件','单片机','开源'],
+        desc:'开源电子原型平台，通过简单的 C/C++ 代码控制硬件，适合创客与教学。' },
+      { id:'raspberrypi', name:'Raspberry Pi', url:'https://www.raspberrypi.com', icon:'🍓',
+        color:['#c51a4a','#e85d85'], cat:'开发工具', tags:['硬件','Linux','教育'],
+        desc:'单板计算机品牌，广泛用于学习 Linux、物联网与家庭服务器项目。' },
+      { id:'electron', name:'Electron', url:'https://www.electronjs.org', icon:'⚡',
+        color:['#2b2e3a','#4b5563'], cat:'开发工具', tags:['桌面','跨平台','Web'],
+        desc:'用 Web 技术构建跨平台桌面应用的框架，VS Code 等均基于它。' },
+      { id:'tauri', name:'Tauri', url:'https://tauri.app', icon:'🦀',
+        color:['#24c8db','#ffc131'], cat:'开发工具', tags:['桌面','Rust','轻量'],
+        desc:'基于 Rust 的桌面应用框架，体积小、内存占用低，安全性好。' },
+      { id:'qt', name:'Qt', url:'https://www.qt.io', icon:'🔷',
+        color:['#41cd52','#6ee07e'], cat:'开发工具', tags:['C++','跨平台','桌面'],
+        desc:'成熟的跨平台 C++ 应用框架，广泛用于桌面、嵌入式与工业软件。' },
+      { id:'flutter', name:'Flutter', url:'https://flutter.dev', icon:'🐦',
+        color:['#02569b','#45a5f6'], cat:'开发工具', tags:['跨平台','UI','Google'],
+        desc:'Google 推出的跨平台 UI 框架，一套代码可构建 Android、iOS 与 Web 应用。' },
+      { id:'dart', name:'Dart', url:'https://dart.dev', icon:'🏹',
+        color:['#0175c2','#2fa3ea'], cat:'开发工具', tags:['语言','Flutter','Google'],
+        desc:'为客户端开发优化的编程语言，是 Flutter 框架的官方语言。' },
+      { id:'reactnative', name:'React Native', url:'https://reactnative.dev', icon:'⚛️',
+        color:['#61dafb','#21a1c4'], cat:'开发工具', tags:['移动端','React','跨平台'],
+        desc:'用 React 编写原生移动应用的框架，一套代码同时支持 iOS 与 Android。' },
+      { id:'c', name:'C 语言', url:'https://en.cppreference.com/w/c', icon:'🔧',
+        color:['#283593','#5c6bc0'], cat:'开发工具', tags:['语言','底层','系统'],
+        desc:'面向过程的通用编程语言，是操作系统、嵌入式与算法竞赛的常用语言。' },
+      { id:'cpp', name:'C++', url:'https://en.cppreference.com/w/cpp', icon:'🔩',
+        color:['#00599c','#4a90e2'], cat:'开发工具', tags:['语言','面向对象','性能'],
+        desc:'在 C 基础上发展而来的多范式语言，兼顾高性能与抽象能力。' },
+      { id:'csharp', name:'C#', url:'https://learn.microsoft.com/dotnet/csharp/', icon:'🎯',
+        color:['#68217a','#9b4fc0'], cat:'开发工具', tags:['语言','.NET','微软'],
+        desc:'微软推出的现代面向对象语言，常用于 Unity 游戏与 .NET 后端开发。' },
+      { id:'java', name:'Java', url:'https://dev.java', icon:'☕',
+        color:['#e76f00','#f5a623'], cat:'开发工具', tags:['语言','后端','JVM'],
+        desc:'跨平台的面向对象语言，企业级后端、Android 与大数据领域的常青树。' },
+      { id:'kotlin', name:'Kotlin', url:'https://kotlinlang.org', icon:'🟣',
+        color:['#7f52ff','#a882ff'], cat:'开发工具', tags:['语言','Android','JetBrains'],
+        desc:'JetBrains 打造的现代 JVM 语言，是 Android 官方推荐语言之一。' },
+      { id:'swift', name:'Swift', url:'https://swift.org', icon:'🦅',
+        color:['#f05138','#ff7a5e'], cat:'开发工具', tags:['语言','iOS','Apple'],
+        desc:'苹果推出的现代编程语言，用于 iOS、macOS 与服务器端开发。' },
+      { id:'go', name:'Go', url:'https://go.dev', icon:'🐹',
+        color:['#00add8','#4dc9e6'], cat:'开发工具', tags:['语言','后端','并发'],
+        desc:'Google 推出的编程语言，语法简洁、编译快，适合云原生与后端服务。' },
+      { id:'rust', name:'Rust', url:'https://www.rust-lang.org', icon:'🦀',
+        color:['#000000','#4b5563'], cat:'开发工具', tags:['语言','内存安全','性能'],
+        desc:'以内存安全与高性能著称的系统级语言，连续多年最受欢迎。' },
+      { id:'php', name:'PHP', url:'https://www.php.net', icon:'🐘',
+        color:['#777bb4','#9b9fd4'], cat:'开发工具', tags:['语言','后端','Web'],
+        desc:'专为 Web 设计的服务器端脚本语言，驱动着大量网站与内容系统。' },
+      { id:'ruby', name:'Ruby', url:'https://www.ruby-lang.org', icon:'💎',
+        color:['#cc342d','#e85d56'], cat:'开发工具', tags:['语言','后端','优雅'],
+        desc:'以开发者幸福感为设计目标的语言，Ruby on Rails 的基石。' },
+      { id:'phpstorm2', name:'Laravel', url:'https://laravel.com', icon:'🦄',
+        color:['#ff2d20','#ff6b5e'], cat:'开发工具', tags:['PHP','框架','后端'],
+        desc:'优雅的 PHP Web 框架，内置 ORM、队列、认证等完整后端能力。' },
+      { id:'django', name:'Django', url:'https://www.djangoproject.com', icon:'🎸',
+        color:['#092e20','#0f4d38'], cat:'开发工具', tags:['Python','框架','后端'],
+        desc:'Python 的全栈 Web 框架，自带后台管理，适合快速构建业务系统。' },
+      { id:'flask', name:'Flask', url:'https://flask.palletsprojects.com', icon:'🌶️',
+        color:['#000000','#4b5563'], cat:'开发工具', tags:['Python','框架','轻量'],
+        desc:'轻量灵活的 Python Web 框架，适合小型服务与 API 开发。' },
+      { id:'spring', name:'Spring', url:'https://spring.io', icon:'🌱',
+        color:['#6db33f','#8fd16a'], cat:'开发工具', tags:['Java','框架','企业'],
+        desc:'Java 生态最主流的企业级框架，覆盖 Web、数据、安全与微服务。' },
+      { id:'nodeexpress', name:'Express', url:'https://expressjs.com', icon:'🚂',
+        color:['#000000','#4b5563'], cat:'开发工具', tags:['Node','框架','后端'],
+        desc:'Node.js 最经典的 Web 框架，简洁灵活，中间件生态庞大。' },
+      { id:'fastapi', name:'FastAPI', url:'https://fastapi.tiangolo.com', icon:'⚡',
+        color:['#009688','#26bdb0'], cat:'开发工具', tags:['Python','API','异步'],
+        desc:'现代高性能 Python Web 框架，基于类型提示自动生成接口文档。' },
+      { id:'devcpp', name:'Dev-C++', url:'https://sourceforge.net/projects/orwelldevcpp/', icon:'🛠️',
+        color:['#1e5f8a','#3c9ad6'], cat:'开发工具', tags:['IDE','C++','轻量'],
+        desc:'轻量免费的 C/C++ 集成开发环境，常用于教学与算法练习。' },
+      { id:'intellij', name:'IntelliJ IDEA', url:'https://www.jetbrains.com/idea/', icon:'🅸',
+        color:['#fe315d','#ff7a97'], cat:'开发工具', tags:['IDE','Java','JetBrains'],
+        desc:'JetBrains 的 Java 集成开发环境，以强大的代码分析与重构能力著称。' },
+      { id:'eclipse', name:'Eclipse', url:'https://www.eclipse.org', icon:'🌘',
+        color:['#2c2255','#5a4a9e'], cat:'开发工具', tags:['IDE','Java','插件'],
+        desc:'老牌开源 Java 开发平台，通过插件可扩展支持多种语言与框架。' },
+      { id:'onlinegdb', name:'OnlineGDB', url:'https://www.onlinegdb.com', icon:'🐞',
+        color:['#2f6f4e','#4caf7d'], cat:'开发工具', tags:['在线编译','调试','多语言'],
+        desc:'在线编译器与调试器，支持 C/C++、Python、Java 等多种语言，打开即用。' },
+      { id:'leetcode_dev', name:'LeetCode 题解', url:'https://leetcode.cn', icon:'🧩',
+        color:['#ffa116','#ffc966'], cat:'开发工具', tags:['算法','刷题','面试'],
+        desc:'在线算法题库，覆盖面试高频题型，支持多种语言提交与讨论。' },
+
+      /* ================= 设计资源 ================= */
+      { id:'figma', name:'Figma', url:'https://www.figma.com', icon:'🎨',
+        color:['#a259ff','#f24e1e'], cat:'设计资源', tags:['UI','协作','原型'],
+        desc:'浏览器里的协作设计工具，从线框图到高保真原型都能搞定。' },
+      { id:'sketch', name:'Sketch', url:'https://www.sketch.com', icon:'💎',
+        color:['#fdb300','#ffcc4d'], cat:'设计资源', tags:['UI','macOS','矢量'],
+        desc:'macOS 平台经典 UI 设计工具，插件生态与符号系统成熟。' },
+      { id:'adobexd', name:'Adobe XD', url:'https://helpx.adobe.com/xd/get-started.html', icon:'🟪',
+        color:['#ff61f6','#ff9af8'], cat:'设计资源', tags:['UI','原型','Adobe'],
+        desc:'Adobe 的 UI 与原型设计工具，与 Photoshop、Illustrator 协同顺畅。' },
+      { id:'photoshop', name:'Photoshop', url:'https://www.adobe.com/products/photoshop.html', icon:'🖌️',
+        color:['#31a8ff','#001e36'], cat:'设计资源', tags:['修图','位图','Adobe'],
+        desc:'行业标准的位图编辑软件，修图、合成与视觉设计的必备工具。' },
+      { id:'illustrator', name:'Illustrator', url:'https://www.adobe.com/products/illustrator.html', icon:'🎯',
+        color:['#ff9a00','#ffbe4d'], cat:'设计资源', tags:['矢量','插画','Adobe'],
+        desc:'专业矢量图形软件，用于 Logo、图标与插画设计。' },
+      { id:'canva', name:'Canva', url:'https://www.canva.com', icon:'🎀',
+        color:['#00c4cc','#7d2ae8'], cat:'设计资源', tags:['模板','在线','易用'],
+        desc:'在线设计平台，海量模板让非设计师也能快速做出精美物料。' },
+      { id:'jsdesign', name:'即时设计', url:'https://js.design', icon:'⚡',
+        color:['#7b61ff','#a08cff'], cat:'设计资源', tags:['UI','国产','协作'],
+        desc:'国产在线协作设计工具，功能对标 Figma，中文体验友好。' },
+      { id:'gaoding', name:'稿定设计', url:'https://www.gaoding.com', icon:'📐',
+        color:['#5b6cff','#8b9bff'], cat:'设计资源', tags:['模板','电商','国产'],
+        desc:'面向电商与营销场景的在线设计平台，模板与抠图功能实用。' },
+      { id:'dribbble', name:'Dribbble', url:'https://dribbble.com', icon:'🏀',
+        color:['#ea4c89','#f082ac'], cat:'设计资源', tags:['灵感','UI','作品'],
+        desc:'设计师作品分享社区，寻找视觉灵感与配色方案的好去处。' },
+      { id:'behance', name:'Behance', url:'https://www.behance.net', icon:'🅱️',
+        color:['#1769ff','#0057e7'], cat:'设计资源', tags:['作品集','创意','品牌'],
+        desc:'Adobe 旗下的创意作品展示平台，覆盖品牌、插画、摄影等领域。' },
+      { id:'pinterest', name:'Pinterest', url:'https://www.pinterest.com', icon:'📌',
+        color:['#e60023','#ff4d6d'], cat:'设计资源', tags:['灵感','图片','收藏'],
+        desc:'图片灵感收集平台，通过瀑布流发现视觉创意与参考。' },
+      { id:'huaban', name:'花瓣网', url:'https://huaban.com', icon:'🌸',
+        color:['#e74c3c','#ff7b6b'], cat:'设计资源', tags:['灵感','采集','国产'],
+        desc:'国内的设计灵感采集平台，可把喜欢的图片分类收藏到画板。' },
+      { id:'unsplash', name:'Unsplash', url:'https://unsplash.com', icon:'📷',
+        color:['#111827','#6b7280'], cat:'设计资源', tags:['图片','免费','摄影'],
+        desc:'高质量免费图库，图片可商用，是做原型和配图的常用来源。' },
+      { id:'pexels', name:'Pexels', url:'https://www.pexels.com', icon:'🖼️',
+        color:['#05a081','#2bc4a2'], cat:'设计资源', tags:['图片','视频','免费'],
+        desc:'免费图片与视频素材库，授权宽松，支持中文搜索。' },
+      { id:'pixabay', name:'Pixabay', url:'https://pixabay.com', icon:'🌄',
+        color:['#2ec66d','#5cdb8d'], cat:'设计资源', tags:['图片','插画','免费'],
+        desc:'免费素材库，除照片外还提供插画、矢量图与视频。' },
+      { id:'freepik', name:'Freepik', url:'https://www.freepik.com', icon:'🎁',
+        color:['#1273eb','#4a9bff'], cat:'设计资源', tags:['素材','矢量','模板'],
+        desc:'综合素材站，提供矢量图、图标、PSD 模板与插画资源。' },
+      { id:'iconfont', name:'Iconfont', url:'https://www.iconfont.cn', icon:'🔤',
+        color:['#1e88e5','#42a5f5'], cat:'设计资源', tags:['图标','矢量','阿里'],
+        desc:'阿里巴巴矢量图标库，海量图标可自定义颜色与尺寸并打包下载。' },
+      { id:'iconpark', name:'IconPark', url:'https://iconpark.oceanengine.com', icon:'🧩',
+        color:['#3b82f6','#60a5fa'], cat:'设计资源', tags:['图标','字节','可定制'],
+        desc:'字节跳动开源的图标库，支持一键调整风格、描边与配色。' },
+      { id:'lottiefiles', name:'LottieFiles', url:'https://lottiefiles.com', icon:'✨',
+        color:['#00ddb3','#4fe8c9'], cat:'设计资源', tags:['动画','JSON','轻量'],
+        desc:'Lottie 动画资源与工具平台，动画文件小、可交互，适合 Web 与 App。' },
+      { id:'coolors', name:'Coolors', url:'https://coolors.co', icon:'🌈',
+        color:['#10b981','#34d399'], cat:'设计资源', tags:['配色','色板','工具'],
+        desc:'快速生成与调整配色方案的在线工具，支持导出多种格式。' },
+      { id:'colorhunt', name:'Color Hunt', url:'https://colorhunt.co', icon:'🎨',
+        color:['#f97316','#fb923c'], cat:'设计资源', tags:['配色','灵感','四色'],
+        desc:'精选四色配色方案集合，适合快速挑选和谐的色板。' },
+      { id:'googlefonts', name:'Google Fonts', url:'https://fonts.google.com', icon:'🔠',
+        color:['#4285f4','#34a853'], cat:'设计资源', tags:['字体','免费','Web'],
+        desc:'Google 的免费字体库，可直接嵌入网页，支持多语言与可变字体。' },
+      { id:'ziti', name:'字体天下', url:'https://www.fonts.net.cn', icon:'🈶',
+        color:['#e74c3c','#ff7b6b'], cat:'设计资源', tags:['中文字体','下载','免费'],
+        desc:'中文免费字体下载站，收录大量可商用中文字体资源。' },
+      { id:'removebg', name:'Remove.bg', url:'https://www.remove.bg', icon:'✂️',
+        color:['#5468ff','#7b8aff'], cat:'设计资源', tags:['抠图','AI','免安装'],
+        desc:'一键自动抠图工具，上传图片即可去除背景，边缘处理自然。' },
+      { id:'tinypng', name:'TinyPNG', url:'https://tinypng.com', icon:'🐼',
+        color:['#0d9488','#2dd4bf'], cat:'设计资源', tags:['压缩','图片','优化'],
+        desc:'在线图片压缩工具，在不明显损失画质的前提下显著减小体积。' },
+      { id:'squoosh', name:'Squoosh', url:'https://squoosh.app', icon:'🖼️',
+        color:['#3b82f6','#60a5fa'], cat:'设计资源', tags:['压缩','对比','Google'],
+        desc:'Google 出品的图片压缩工具，可实时对比不同格式与压缩效果。' },
+      { id:'miro', name:'Miro', url:'https://miro.com', icon:'🧠',
+        color:['#ffd02f','#ffb800'], cat:'设计资源', tags:['白板','协作','头脑风暴'],
+        desc:'在线协作白板，适合流程图、用户旅程与团队头脑风暴。' },
+      { id:'whimsical', name:'Whimsical', url:'https://whimsical.com', icon:'🌀',
+        color:['#6c5ce7','#a29bfe'], cat:'设计资源', tags:['流程图','线框图','协作'],
+        desc:'快速绘制流程图、线框图与思维导图的协作工具，界面清爽。' },
+      { id:'axure', name:'Axure RP', url:'https://www.axure.com', icon:'📐',
+        color:['#3d6cb9','#6b9ae0'], cat:'设计资源', tags:['原型','交互','高保真'],
+        desc:'专业原型设计工具，适合复杂交互逻辑与高保真原型的制作。' },
+      { id:'adobefonts', name:'Adobe Fonts', url:'https://fonts.adobe.com', icon:'🅰️',
+        color:['#ff0000','#ff5252'], cat:'设计资源', tags:['字体','Adobe','订阅'],
+        desc:'Adobe 的字体订阅服务，包含大量优质商用字体，可直接同步使用。' },
+
+      /* ================= AI 工具 ================= */
+      { id:'chatgpt', name:'ChatGPT', url:'https://chat.openai.com', icon:'💬',
+        color:['#10a37f','#34d399'], cat:'AI 工具', tags:['对话','写作','助手'],
+        desc:'OpenAI 推出的对话式 AI 助手，可用于写作、编程、翻译与头脑风暴。' },
+      { id:'claude', name:'Claude', url:'https://claude.ai', icon:'🧠',
+        color:['#d97757','#f0a58a'], cat:'AI 工具', tags:['对话','长文本','分析'],
+        desc:'Anthropic 的 AI 助手，擅长长文档理解、代码与结构化分析。' },
+      { id:'gemini', name:'Gemini', url:'https://gemini.google.com', icon:'💎',
+        color:['#4285f4','#8ab4f8'], cat:'AI 工具', tags:['对话','Google','多模态'],
+        desc:'Google 的多模态 AI 助手，与搜索、Workspace 生态深度整合。' },
+      { id:'copilot', name:'GitHub Copilot', url:'https://github.com/features/copilot', icon:'🚁',
+        color:['#24292f','#57606a'], cat:'AI 工具', tags:['编程','补全','GitHub'],
+        desc:'GitHub 的 AI 编程助手，在编辑器中实时给出代码建议与补全。' },
+      { id:'wenxin', name:'文心一言', url:'https://yiyan.baidu.com', icon:'🀄',
+        color:['#2932e1','#5b64ff'], cat:'AI 工具', tags:['国产','对话','百度'],
+        desc:'百度推出的大模型助手，中文问答、写作与办公场景表现稳定。' },
+      { id:'kimi', name:'Kimi', url:'https://kimi.moonshot.cn', icon:'🌙',
+        color:['#1a1a1a','#4b5563'], cat:'AI 工具', tags:['国产','长文本','月之暗面'],
+        desc:'月之暗面推出的 AI 助手，以超长上下文与文档分析见长。' },
+      { id:'zhipu', name:'智谱清言', url:'https://chatglm.cn', icon:'🔮',
+        color:['#4f46e5','#8b5cf6'], cat:'AI 工具', tags:['国产','对话','清华'],
+        desc:'智谱 AI 推出的对话助手，基于 GLM 系列模型，中文能力良好。' },
+      { id:'deepseek', name:'DeepSeek', url:'https://www.deepseek.com', icon:'🐋',
+        color:['#1e40af','#3b82f6'], cat:'AI 工具', tags:['国产','推理','开源'],
+        desc:'深度求索推出的模型，推理与代码能力突出，部分模型已开源。' },
+      { id:'doubao', name:'豆包', url:'https://www.doubao.com', icon:'🫘',
+        color:['#3b82f6','#60a5fa'], cat:'AI 工具', tags:['国产','字节','对话'],
+        desc:'字节跳动推出的 AI 助手，覆盖问答、写作、图片与语音场景。' },
+      { id:'midjourney', name:'Midjourney', url:'https://www.midjourney.com', icon:'🖼️',
+        color:['#4f46e5','#8b5cf6'], cat:'AI 工具', tags:['绘图','生成','创意'],
+        desc:'知名的 AI 绘画工具，通过提示词生成风格化图像与概念设计。' },
+      { id:'stablediffusion', name:'Stable Diffusion', url:'https://stability.ai', icon:'🌌',
+        color:['#6d28d9','#a78bfa'], cat:'AI 工具', tags:['绘图','开源','本地'],
+        desc:'开源图像生成模型，可本地部署并微调，社区生态丰富。' },
+      { id:'dalle', name:'DALL·E', url:'https://openai.com/dall-e-3', icon:'🎨',
+        color:['#10a37f','#34d399'], cat:'AI 工具', tags:['绘图','OpenAI','文本生图'],
+        desc:'OpenAI 的文本生成图像模型，理解复杂提示词的能力较强。' },
+      { id:'suno', name:'Suno', url:'https://suno.com', icon:'🎵',
+        color:['#000000','#4b5563'], cat:'AI 工具', tags:['音乐','生成','作曲'],
+        desc:'AI 音乐生成平台，输入歌词与风格即可生成完整歌曲。' },
+      { id:'sora', name:'Sora', url:'https://openai.com/sora', icon:'🎬',
+        color:['#10a37f','#34d399'], cat:'AI 工具', tags:['视频','生成','OpenAI'],
+        desc:'OpenAI 的文本生成视频模型，可产出连贯且富有想象力的短视频。' },
+      { id:'runway', name:'Runway', url:'https://runwayml.com', icon:'🎞️',
+        color:['#000000','#4b5563'], cat:'AI 工具', tags:['视频','编辑','生成'],
+        desc:'AI 视频创作工具，支持文生视频、抠像、风格转换等后期能力。' },
+      { id:'pika', name:'Pika', url:'https://pika.art', icon:'✨',
+        color:['#ec4899','#f472b6'], cat:'AI 工具', tags:['视频','生成','创意'],
+        desc:'轻量的 AI 视频生成工具，操作简单，适合快速产出创意短片。' },
+      { id:'elevenlabs', name:'ElevenLabs', url:'https://elevenlabs.io', icon:'🎙️',
+        color:['#000000','#4b5563'], cat:'AI 工具', tags:['语音','合成','配音'],
+        desc:'AI 语音合成平台，可生成自然的多语言配音与有声内容。' },
+      { id:'heygen', name:'HeyGen', url:'https://www.heygen.com', icon:'🧑‍💼',
+        color:['#7c3aed','#a78bfa'], cat:'AI 工具', tags:['数字人','视频','营销'],
+        desc:'AI 数字人视频平台，输入文稿即可生成口型同步的讲解视频。' },
+      { id:'perplexity', name:'Perplexity', url:'https://www.perplexity.ai', icon:'🔍',
+        color:['#20808d','#20b2aa'], cat:'AI 工具', tags:['搜索','问答','引用'],
+        desc:'带引用来源的 AI 搜索引擎，适合做资料检索与事实核查。' },
+      { id:'metaso', name:'秘塔 AI 搜索', url:'https://metaso.cn', icon:'🧭',
+        color:['#2563eb','#60a5fa'], cat:'AI 工具', tags:['国产','搜索','无广告'],
+        desc:'国内的 AI 搜索工具，自动整理大纲、思维导图与引用来源。' },
+      { id:'poe', name:'Poe', url:'https://poe.com', icon:'🤖',
+        color:['#5d3fd3','#8b6bff'], cat:'AI 工具', tags:['聚合','多模型','对话'],
+        desc:'Quora 推出的 AI 聚合平台，一个界面切换多个主流模型。' },
+      { id:'huggingface', name:'Hugging Face', url:'https://huggingface.co', icon:'🤗',
+        color:['#ff9d00','#ffd166'], cat:'AI 工具', tags:['模型','开源','数据集'],
+        desc:'开源 AI 模型与数据集社区，可直接在线试用各种预训练模型。' },
+      { id:'ollama', name:'Ollama', url:'https://ollama.com', icon:'🦙',
+        color:['#000000','#4b5563'], cat:'AI 工具', tags:['本地','大模型','运行'],
+        desc:'在本地运行开源大模型的工具，一条命令即可拉取并对话。' },
+      { id:'cursor_ai', name:'Cursor AI', url:'https://cursor.com', icon:'🖱️',
+        color:['#0f172a','#475569'], cat:'AI 工具', tags:['编程','编辑器','重构'],
+        desc:'面向开发者的 AI 编辑器，可基于整个代码库进行问答与修改。' },
+      { id:'notionai', name:'Notion AI', url:'https://www.notion.so/product/ai', icon:'📝',
+        color:['#111111','#4b5563'], cat:'AI 工具', tags:['写作','笔记','总结'],
+        desc:'集成在 Notion 中的 AI 助手，用于总结、续写与整理笔记内容。' },
+      { id:'grammarly', name:'Grammarly', url:'https://www.grammarly.com', icon:'✍️',
+        color:['#15c39a','#4dd9b5'], cat:'AI 工具', tags:['英文','语法','润色'],
+        desc:'英文写作助手，实时检查语法、拼写与语气，并给出改写建议。' },
+      { id:'leonardo', name:'Leonardo AI', url:'https://leonardo.ai', icon:'🎭',
+        color:['#7c3aed','#a78bfa'], cat:'AI 工具', tags:['绘图','游戏','素材'],
+        desc:'面向游戏与设计场景的 AI 绘图平台，提供丰富的风格模型。' },
+      { id:'tongyi', name:'通义千问', url:'https://tongyi.aliyun.com', icon:'☁️',
+        color:['#615ced','#8b5cf6'], cat:'AI 工具', tags:['国产','对话','阿里'],
+        desc:'阿里云推出的大模型助手，中文理解与办公场景表现不错。' },
+      { id:'windsurf', name:'Windsurf', url:'https://windsurf.com', icon:'🏄',
+        color:['#0ea5e9','#38bdf8'], cat:'AI 工具', tags:['编程','IDE','智能体'],
+        desc:'AI 原生 IDE，强调智能体协作与流畅的代码编辑体验。' },
+      { id:'grok', name:'Grok', url:'https://grok.com', icon:'🛸',
+        color:['#000000','#4b5563'], cat:'AI 工具', tags:['对话','X','实时'],
+        desc:'xAI 推出的 AI 助手，可结合 X 平台的实时信息进行问答。' },
+
+      /* ================= 学习平台 ================= */
+      { id:'juejin', name:'掘金', url:'https://juejin.cn', icon:'⛏️',
+        color:['#1e80ff','#4098ff'], cat:'学习平台', tags:['技术','社区','前端'],
+        desc:'国内技术内容社区，前端、后端与移动开发的文章质量较高。' },
+      { id:'zhihu', name:'知乎', url:'https://www.zhihu.com', icon:'💡',
+        color:['#0084ff','#4da3ff'], cat:'学习平台', tags:['问答','知识','社区'],
+        desc:'中文问答社区，适合查找行业经验、观点分析与深度讨论。' },
+      { id:'csdn', name:'CSDN', url:'https://www.csdn.net', icon:'📰',
+        color:['#fc5531','#ff7b5e'], cat:'学习平台', tags:['技术','博客','中文'],
+        desc:'国内老牌技术博客平台，覆盖大量实战教程与问题记录。' },
+      { id:'cnblogs', name:'博客园', url:'https://www.cnblogs.com', icon:'📓',
+        color:['#2c5aa0','#4a7bc8'], cat:'学习平台', tags:['博客','.NET','技术'],
+        desc:'中文技术博客社区，以 .NET、Java 与后端文章见长。' },
+      { id:'segmentfault', name:'SegmentFault', url:'https://segmentfault.com', icon:'🔺',
+        color:['#009a61','#2bc48a'], cat:'学习平台', tags:['问答','技术','社区'],
+        desc:'中文开发者问答与专栏社区，内容质量与讨论氛围较好。' },
+      { id:'v2ex', name:'V2EX', url:'https://www.v2ex.com', icon:'🅥',
+        color:['#778087','#9aa5b1'], cat:'学习平台', tags:['社区','极客','讨论'],
+        desc:'中文极客社区，技术、创业与生活话题的讨论氛围独特。' },
+      { id:'imooc', name:'慕课网', url:'https://www.imooc.com', icon:'🎓',
+        color:['#08b7a9','#2ed9cb'], cat:'学习平台', tags:['课程','编程','实战'],
+        desc:'国内 IT 技能学习平台，课程偏实战，覆盖前后端与移动开发。' },
+      { id:'geekbang', name:'极客时间', url:'https://time.geekbang.org', icon:'⏰',
+        color:['#f4511e','#ff7a4d'], cat:'学习平台', tags:['专栏','进阶','架构'],
+        desc:'面向工程师的付费专栏平台，内容偏进阶与体系化。' },
+      { id:'coursera', name:'Coursera', url:'https://www.coursera.org', icon:'🎓',
+        color:['#0056d2','#3b82f6'], cat:'学习平台', tags:['课程','名校','证书'],
+        desc:'与全球高校和企业合作的在线课程平台，提供系统化学习路径。' },
+      { id:'edx', name:'edX', url:'https://www.edx.org', icon:'🎓',
+        color:['#02262b','#0d4f5c'], cat:'学习平台', tags:['课程','名校','免费'],
+        desc:'哈佛与 MIT 联合创办的在线课程平台，学术课程质量高。' },
+      { id:'udemy', name:'Udemy', url:'https://www.udemy.com', icon:'🎯',
+        color:['#a435f0','#c06bff'], cat:'学习平台', tags:['课程','实用','折扣'],
+        desc:'课程种类极丰富的在线学习平台，常有大幅折扣。' },
+      { id:'udacity', name:'Udacity', url:'https://www.udacity.com', icon:'🚀',
+        color:['#02b3e4','#4dd0f0'], cat:'学习平台', tags:['纳米学位','项目','科技'],
+        desc:'以项目驱动的科技课程平台，纳米学位偏就业导向。' },
+      { id:'khan', name:'Khan Academy', url:'https://www.khanacademy.org', icon:'🎓',
+        color:['#14bf96','#3dd9b0'], cat:'学习平台', tags:['免费','基础','数学'],
+        desc:'非营利教育平台，数学、科学与编程基础课程完全免费。' },
+      { id:'xuetangx', name:'学堂在线', url:'https://www.xuetangx.com', icon:'🏫',
+        color:['#5c2d91','#8b5cf6'], cat:'学习平台', tags:['慕课','清华','国内'],
+        desc:'清华大学发起的慕课平台，汇集国内高校优质课程资源。' },
+      { id:'icourse163', name:'中国大学MOOC', url:'https://www.icourse163.org', icon:'🎓',
+        color:['#00a1e9','#3bbff0'], cat:'学习平台', tags:['慕课','高校','免费'],
+        desc:'网易与高教社合作的慕课平台，国内高校课程覆盖面广。' },
+      { id:'runoob', name:'菜鸟教程', url:'https://www.runoob.com', icon:'📗',
+        color:['#2d8cf0','#5cadff'], cat:'学习平台', tags:['入门','教程','参考'],
+        desc:'中文编程入门教程站，语法速查与示例代码都很直观。' },
+      { id:'w3school', name:'W3School', url:'https://www.w3school.com.cn', icon:'📘',
+        color:['#04aa6d','#34d399'], cat:'学习平台', tags:['前端','基础','参考'],
+        desc:'Web 技术基础教程与在线测试，适合快速查阅标签和属性。' },
+      { id:'freecodecamp', name:'freeCodeCamp', url:'https://www.freecodecamp.org', icon:'🔥',
+        color:['#0a0a23','#3b3b4f'], cat:'学习平台', tags:['免费','实战','认证'],
+        desc:'免费学习编程的公益平台，以项目驱动的实战练习为主。' },
+      { id:'codecademy', name:'Codecademy', url:'https://www.codecademy.com', icon:'💻',
+        color:['#1f4056','#3b6b87'], cat:'学习平台', tags:['交互','入门','编程'],
+        desc:'交互式编程学习平台，边写边练，适合零基础入门。' },
+      { id:'leetcode', name:'LeetCode', url:'https://leetcode.cn', icon:'🧩',
+        color:['#ffa116','#ffc966'], cat:'学习平台', tags:['算法','刷题','面试'],
+        desc:'在线算法题库，覆盖面试高频题型，支持多种语言提交与讨论。' },
+      { id:'nowcoder', name:'牛客网', url:'https://www.nowcoder.com', icon:'🐮',
+        color:['#00b894','#33d6b0'], cat:'学习平台', tags:['笔试','面试','校招'],
+        desc:'面向求职者的刷题与面试平台，校招笔试真题资源丰富。' },
+      { id:'luogu', name:'洛谷', url:'https://www.luogu.com.cn', icon:'🟢',
+        color:['#0f9d58','#34c777'], cat:'学习平台', tags:['算法','竞赛','OI'],
+        desc:'国内算法竞赛与刷题社区，题单与讨论区对新手友好。' },
+      { id:'codeforces', name:'Codeforces', url:'https://codeforces.com', icon:'🔵',
+        color:['#1f8acb','#4aa8e8'], cat:'学习平台', tags:['竞赛','算法','国际'],
+        desc:'国际知名的算法竞赛平台，定期举办 Rated 比赛。' },
+      { id:'codewars', name:'Codewars', url:'https://www.codewars.com', icon:'⚔️',
+        color:['#b1361e','#d65a3e'], cat:'学习平台', tags:['刷题','挑战','多语言'],
+        desc:'以“形”为单位的编程挑战平台，可查看他人优雅解法。' },
+      { id:'hackerrank', name:'HackerRank', url:'https://www.hackerrank.com', icon:'💚',
+        color:['#00ea64','#4cf08c'], cat:'学习平台', tags:['刷题','面试','技能'],
+        desc:'技能测评与编程挑战平台，被不少企业用于技术笔试。' },
+      { id:'atcoder', name:'AtCoder', url:'https://atcoder.jp', icon:'🟦',
+        color:['#2c3e50','#4b6584'], cat:'学习平台', tags:['竞赛','算法','日本'],
+        desc:'日本的算法竞赛平台，题目质量高，适合系统提升算法能力。' },
+      { id:'duolingo', name:'Duolingo', url:'https://www.duolingo.com', icon:'🦉',
+        color:['#58cc02','#89e219'], cat:'学习平台', tags:['语言','游戏化','免费'],
+        desc:'游戏化语言学习应用，用短练习与连续打卡保持学习动力。' },
+      { id:'dedao', name:'得到', url:'https://www.dedao.cn', icon:'📚',
+        color:['#d4237a','#ff5ca8'], cat:'学习平台', tags:['知识','音频','课程'],
+        desc:'知识付费平台，提供听书、课程与电子书，适合碎片时间学习。' },
+      { id:'ximalaya', name:'喜马拉雅', url:'https://www.ximalaya.com', icon:'🎧',
+        color:['#f86442','#ff8a6b'], cat:'学习平台', tags:['音频','播客','有声书'],
+        desc:'中文音频内容平台，覆盖有声书、播客与知识节目。' },
+      { id:'bilibili_edu', name:'B站知识区', url:'https://www.bilibili.com/v/knowledge/', icon:'📺',
+        color:['#00a1d6','#fb7299'], cat:'学习平台', tags:['视频','教程','免费'],
+        desc:'B 站知识区，聚集了大量免费的技术、科普与学习类视频。' },
+
+      /* ================= 效率办公 ================= */
+      { id:'notion', name:'Notion', url:'https://www.notion.so', icon:'📝',
+        color:['#111111','#4b5563'], cat:'效率办公', tags:['笔记','知识库','协作'],
+        desc:'集笔记、数据库、看板于一体的协作空间，自由度非常高。' },
+      { id:'obsidian', name:'Obsidian', url:'https://obsidian.md', icon:'🔮',
+        color:['#7c3aed','#a78bfa'], cat:'效率办公', tags:['笔记','本地','双链'],
+        desc:'基于本地 Markdown 的笔记工具，双向链接与插件生态强大。' },
+      { id:'logseq', name:'Logseq', url:'https://logseq.com', icon:'🧩',
+        color:['#002b36','#0d4a5c'], cat:'效率办公', tags:['大纲','双链','开源'],
+        desc:'大纲式双链笔记工具，强调日记流与知识网络的自然生长。' },
+      { id:'roam', name:'Roam Research', url:'https://roamresearch.com', icon:'🧠',
+        color:['#2563eb','#60a5fa'], cat:'效率办公', tags:['双链','笔记','网络'],
+        desc:'双向链接笔记的开创者之一，适合构建个人知识网络。' },
+      { id:'yuque', name:'语雀', url:'https://www.yuque.com', icon:'📒',
+        color:['#00b96b','#34d399'], cat:'效率办公', tags:['文档','知识库','国产'],
+        desc:'蚂蚁集团出品的知识库工具，中文排版与团队协作体验良好。' },
+      { id:'evernote', name:'印象笔记', url:'https://www.yinxiang.com', icon:'🐘',
+        color:['#00a82d','#2ecc71'], cat:'效率办公', tags:['笔记','剪藏','同步'],
+        desc:'经典笔记工具，网页剪藏与多端同步功能成熟。' },
+      { id:'youdao', name:'有道云笔记', url:'https://note.youdao.com', icon:'☁️',
+        color:['#d9434e','#ff6b76'], cat:'效率办公', tags:['笔记','文档','扫描'],
+        desc:'国产云笔记工具，支持文档、扫描与多端同步。' },
+      { id:'office365', name:'Microsoft 365', url:'https://www.microsoft.com/microsoft-365', icon:'🅾️',
+        color:['#d83b01','#ff6a3d'], cat:'效率办公', tags:['Office','文档','云'],
+        desc:'微软的办公套件订阅服务，包含 Word、Excel、PowerPoint 与云存储。' },
+      { id:'wps', name:'WPS Office', url:'https://www.wps.cn', icon:'🅆',
+        color:['#f5222d','#ff6b6b'], cat:'效率办公', tags:['办公','文档','国产'],
+        desc:'国产办公套件，兼容主流文档格式，云文档与模板资源丰富。' },
+      { id:'googledocs', name:'Google Docs', url:'https://docs.google.com', icon:'📄',
+        color:['#4285f4','#34a853'], cat:'效率办公', tags:['文档','在线','协作'],
+        desc:'在线文档编辑器，多人实时协作与评论建议功能成熟稳定。' },
+      { id:'tencentdocs', name:'腾讯文档', url:'https://docs.qq.com', icon:'📑',
+        color:['#0052d9','#4a8dff'], cat:'效率办公', tags:['文档','在线','协作'],
+        desc:'腾讯的在线文档工具，支持多人同时编辑与表格收集。' },
+      { id:'shimo', name:'石墨文档', url:'https://shimo.im', icon:'📃',
+        color:['#3a7afe','#6b9aff'], cat:'效率办公', tags:['文档','协作','国产'],
+        desc:'国产在线协作文档，界面简洁，实时协同体验流畅。' },
+      { id:'airtable', name:'Airtable', url:'https://www.airtable.com', icon:'📊',
+        color:['#fcb400','#ffd166'], cat:'效率办公', tags:['数据库','表格','协作'],
+        desc:'把表格与数据库结合的协作工具，可搭建轻量业务系统。' },
+      { id:'trello', name:'Trello', url:'https://trello.com', icon:'📋',
+        color:['#0079bf','#3b9edd'], cat:'效率办公', tags:['看板','任务','协作'],
+        desc:'经典看板式任务管理工具，拖拽卡片即可推进项目进度。' },
+      { id:'clickup', name:'ClickUp', url:'https://clickup.com', icon:'🖱️',
+        color:['#7b68ee','#a594ff'], cat:'效率办公', tags:['项目管理','多视图','协作'],
+        desc:'功能全面的项目管理工具，支持列表、看板、日历与目标视图。' },
+      { id:'asana', name:'Asana', url:'https://asana.com', icon:'🔺',
+        color:['#f06a6a','#ff8f8f'], cat:'效率办公', tags:['项目管理','团队','任务'],
+        desc:'团队任务与项目管理平台，适合跨部门协作与进度跟踪。' },
+      { id:'monday', name:'monday.com', url:'https://monday.com', icon:'📅',
+        color:['#ff3d57','#ff6b81'], cat:'效率办公', tags:['项目管理','自动化','协作'],
+        desc:'可视化工作管理平台，支持自定义流程与自动化规则。' },
+      { id:'linear', name:'Linear', url:'https://linear.app', icon:'📐',
+        color:['#5e6ad2','#828fff'], cat:'效率办公', tags:['项目管理','研发','快捷键'],
+        desc:'为软件团队打造的现代项目管理工具，操作快、界面清爽。' },
+      { id:'todoist', name:'Todoist', url:'https://todoist.com', icon:'✅',
+        color:['#e44332','#ff6b5b'], cat:'效率办公', tags:['待办','任务','GTD'],
+        desc:'简洁高效的待办事项工具，自然语言输入与多端同步体验好。' },
+      { id:'ticktick', name:'滴答清单', url:'https://dida365.com', icon:'⏰',
+        color:['#4772fa','#7b9bff'], cat:'效率办公', tags:['待办','GTD','时间管理'],
+        desc:'跨平台待办事项与时间管理工具，支持番茄钟与日历视图。' },
+      { id:'mstodo', name:'Microsoft To Do', url:'https://to-do.office.com', icon:'📌',
+        color:['#2564cf','#4a8ae0'], cat:'效率办公', tags:['待办','微软','同步'],
+        desc:'微软的待办工具，与 Outlook 任务无缝同步，界面简洁。' },
+      { id:'slack', name:'Slack', url:'https://slack.com', icon:'💬',
+        color:['#4a154b','#7a3d7c'], cat:'效率办公', tags:['团队','沟通','频道'],
+        desc:'团队沟通平台，以频道组织对话，集成大量第三方应用。' },
+      { id:'discord', name:'Discord', url:'https://discord.com', icon:'🎮',
+        color:['#5865f2','#8b95ff'], cat:'效率办公', tags:['社区','语音','频道'],
+        desc:'社区与团队语音沟通平台，游戏与开源社区使用广泛。' },
+      { id:'dingtalk', name:'钉钉', url:'https://www.dingtalk.com', icon:'📌',
+        color:['#0089ff','#4aa9ff'], cat:'效率办公', tags:['办公','沟通','国产'],
+        desc:'阿里巴巴的企业协同平台，整合考勤、审批、会议与文档。' },
+      { id:'feishu', name:'飞书', url:'https://www.feishu.cn', icon:'🚀',
+        color:['#3370ff','#5b8cff'], cat:'效率办公', tags:['协作','文档','会议'],
+        desc:'一站式团队协作平台，整合即时通讯、文档、日历与视频会议。' },
+      { id:'wecom', name:'企业微信', url:'https://work.weixin.qq.com', icon:'💼',
+        color:['#2f7dcd','#5aa0e0'], cat:'效率办公', tags:['企业','沟通','客户'],
+        desc:'腾讯的企业通讯工具，与微信互通，适合客户运营与内部协作。' },
+      { id:'zoom', name:'Zoom', url:'https://zoom.us', icon:'📹',
+        color:['#2d8cff','#5ba6ff'], cat:'效率办公', tags:['视频会议','远程','稳定'],
+        desc:'视频会议平台，连接稳定、操作简单，远程办公常用。' },
+      { id:'tencentmeeting', name:'腾讯会议', url:'https://meeting.tencent.com', icon:'🎥',
+        color:['#006eff','#4a97ff'], cat:'效率办公', tags:['会议','国产','稳定'],
+        desc:'腾讯的视频会议服务，国内网络环境下体验稳定。' },
+      { id:'calendly', name:'Calendly', url:'https://calendly.com', icon:'📅',
+        color:['#006bff','#4a9aff'], cat:'效率办公', tags:['日程','预约','自动化'],
+        desc:'在线预约日程工具，把可预约时段分享给他人，自动同步日历。' },
+      { id:'1password', name:'1Password', url:'https://1password.com', icon:'🔐',
+        color:['#0364d3','#3b8ff0'], cat:'效率办公', tags:['密码','安全','管理'],
+        desc:'密码管理工具，安全存储账号密码并支持团队共享。' },
+      { id:'bitwarden', name:'Bitwarden', url:'https://bitwarden.com', icon:'🛡️',
+        color:['#175ddc','#4a8aff'], cat:'效率办公', tags:['密码','开源','免费'],
+        desc:'开源密码管理器，免费版功能完整，支持自建服务端。' },
+      { id:'zapier', name:'Zapier', url:'https://zapier.com', icon:'⚡',
+        color:['#ff4a00','#ff7a3d'], cat:'效率办公', tags:['自动化','集成','工作流'],
+        desc:'连接数千款应用的自动化平台，无需代码即可搭建工作流。' },
+      { id:'ifttt', name:'IFTTT', url:'https://ifttt.com', icon:'🔀',
+        color:['#000000','#4b5563'], cat:'效率办公', tags:['自动化','触发器','智能'],
+        desc:'“如果这样，那么那样”的自动化服务，连接应用与智能设备。' },
+      { id:'notionai2', name:'Make', url:'https://www.make.com', icon:'🧱',
+        color:['#6d00cc','#a64dff'], cat:'效率办公', tags:['自动化','可视化','集成'],
+        desc:'可视化自动化平台，用连线方式搭建复杂的多步骤工作流。' },
+
+      /* ================= 影音娱乐 ================= */
+      { id:'bilibili', name:'哔哩哔哩', url:'https://www.bilibili.com', icon:'📺',
+        color:['#00a1d6','#fb7299'], cat:'影音娱乐', tags:['视频','学习','弹幕'],
+        desc:'国内综合性视频社区，从娱乐到技术教程都有大量优质内容。' },
+      { id:'youtube', name:'YouTube', url:'https://www.youtube.com', icon:'▶️',
+        color:['#ff0000','#ff5252'], cat:'影音娱乐', tags:['视频','全球','教程'],
+        desc:'全球最大的视频平台，技术大会、课程与评测资源极为丰富。' },
+      { id:'tencentvideo', name:'腾讯视频', url:'https://v.qq.com', icon:'🐧',
+        color:['#ff6a00','#ff9d4d'], cat:'影音娱乐', tags:['影视','综艺','剧集'],
+        desc:'国内主流视频平台，剧集、综艺与纪录片资源丰富。' },
+      { id:'iqiyi', name:'爱奇艺', url:'https://www.iqiyi.com', icon:'🟢',
+        color:['#00be06','#3dd93d'], cat:'影音娱乐', tags:['影视','综艺','自制剧'],
+        desc:'国内长视频平台，自制剧与综艺内容具有较高话题度。' },
+      { id:'youku', name:'优酷', url:'https://www.youku.com', icon:'🔵',
+        color:['#1677ff','#4a9aff'], cat:'影音娱乐', tags:['影视','综艺','港剧'],
+        desc:'阿里旗下的视频平台，剧集与综艺版权资源丰富。' },
+      { id:'mgtv', name:'芒果TV', url:'https://www.mgtv.com', icon:'🥭',
+        color:['#ff6600','#ff944d'], cat:'影音娱乐', tags:['综艺','芒果','独播'],
+        desc:'湖南广电旗下平台，综艺节目与独播剧是其主要特色。' },
+      { id:'netflix', name:'Netflix', url:'https://www.netflix.com', icon:'🎬',
+        color:['#e50914','#ff3d3d'], cat:'影音娱乐', tags:['影视','剧集','流媒体'],
+        desc:'全球流媒体平台，自制剧集与纪录片资源丰富。' },
+      { id:'disneyplus', name:'Disney+', url:'https://www.disneyplus.com', icon:'🏰',
+        color:['#0063e5','#4a9aff'], cat:'影音娱乐', tags:['影视','迪士尼','漫威'],
+        desc:'迪士尼的流媒体平台，漫威、星战与皮克斯内容集中地。' },
+      { id:'twitch', name:'Twitch', url:'https://www.twitch.tv', icon:'🎮',
+        color:['#9146ff','#b47aff'], cat:'影音娱乐', tags:['直播','游戏','互动'],
+        desc:'全球最大的游戏直播平台，也是创作者与观众互动的社区。' },
+      { id:'douyu', name:'斗鱼', url:'https://www.douyu.com', icon:'🐟',
+        color:['#ff5d23','#ff8a5c'], cat:'影音娱乐', tags:['直播','游戏','国内'],
+        desc:'国内游戏直播平台，覆盖电竞赛事与各类游戏主播。' },
+      { id:'huya', name:'虎牙直播', url:'https://www.huya.com', icon:'🐯',
+        color:['#ffa500','#ffc44d'], cat:'影音娱乐', tags:['直播','电竞','游戏'],
+        desc:'国内游戏直播平台，电竞赛事与游戏技术向内容较多。' },
+      { id:'netease', name:'网易云音乐', url:'https://music.163.com', icon:'🎵',
+        color:['#c20c0c','#ff4d4d'], cat:'影音娱乐', tags:['音乐','歌单','评论'],
+        desc:'在线音乐平台，以歌单推荐和评论区氛围著称。' },
+      { id:'qqmusic', name:'QQ音乐', url:'https://y.qq.com', icon:'🎼',
+        color:['#31c27c','#5ee0a0'], cat:'影音娱乐', tags:['音乐','版权','曲库'],
+        desc:'腾讯的音乐平台，正版曲库规模大，与社交生态联动。' },
+      { id:'kugou', name:'酷狗音乐', url:'https://www.kugou.com', icon:'🐶',
+        color:['#2ca2f6','#5cbaff'], cat:'影音娱乐', tags:['音乐','曲库','音效'],
+        desc:'老牌数字音乐平台，曲库庞大，音效与歌词功能完善。' },
+      { id:'spotify', name:'Spotify', url:'https://open.spotify.com', icon:'🎧',
+        color:['#1db954','#1ed760'], cat:'影音娱乐', tags:['音乐','播客','推荐'],
+        desc:'全球流行的流媒体音乐服务，算法推荐与播客内容都很强。' },
+      { id:'applemusic', name:'Apple Music', url:'https://music.apple.com', icon:'🍎',
+        color:['#fa243c','#ff5c70'], cat:'影音娱乐', tags:['音乐','Apple','无损'],
+        desc:'苹果的音乐流媒体服务，支持无损音质与空间音频。' },
+      { id:'soundcloud', name:'SoundCloud', url:'https://soundcloud.com', icon:'☁️',
+        color:['#ff5500','#ff8a4d'], cat:'影音娱乐', tags:['音乐','独立','创作者'],
+        desc:'独立音乐人与音频创作者的分享平台，风格多元。' },
+      { id:'douban', name:'豆瓣', url:'https://www.douban.com', icon:'🌱',
+        color:['#007722','#2ea050'], cat:'影音娱乐', tags:['书影音','评分','社区'],
+        desc:'中文书影音评分与评论社区，找片、找书、找音乐的口碑参考。' },
+      { id:'imdb', name:'IMDb', url:'https://www.imdb.com', icon:'🎥',
+        color:['#f5c518','#ffe066'], cat:'影音娱乐', tags:['影视','评分','资料'],
+        desc:'全球影视资料库，包含评分、演职员表与上映信息。' },
+      { id:'steam', name:'Steam', url:'https://store.steampowered.com', icon:'🎮',
+        color:['#171a21','#2a475e'], cat:'影音娱乐', tags:['游戏','平台','社区'],
+        desc:'全球最大的 PC 游戏发行平台，涵盖购买、社区与创意工坊。' },
+      { id:'epicgames', name:'Epic Games', url:'https://store.epicgames.com', icon:'🎁',
+        color:['#313131','#5c5c5c'], cat:'影音娱乐', tags:['游戏','商店','独占'],
+        desc:'Epic 的游戏商店，每周有免费游戏，独占作品较多。' },
+      { id:'playstation', name:'PlayStation', url:'https://www.playstation.com', icon:'🎮',
+        color:['#003791','#3b6fd4'], cat:'影音娱乐', tags:['主机','索尼','游戏'],
+        desc:'索尼的游戏主机生态，独占大作与会员服务是其核心。' },
+      { id:'nintendo', name:'Nintendo', url:'https://www.nintendo.com', icon:'🍄',
+        color:['#e60012','#ff4d5e'], cat:'影音娱乐', tags:['主机','任天堂','游戏'],
+        desc:'任天堂官方站点，Switch 主机与第一方游戏资讯。' },
+      { id:'xbox', name:'Xbox', url:'https://www.xbox.com', icon:'🟢',
+        color:['#107c10','#2eb82e'], cat:'影音娱乐', tags:['主机','微软','GamePass'],
+        desc:'微软的游戏平台，Game Pass 订阅服务提供大量游戏库。' },
+      { id:'taptap', name:'TapTap', url:'https://www.taptap.cn', icon:'📱',
+        color:['#0dc2b0','#3ddbc9'], cat:'影音娱乐', tags:['手游','评分','社区'],
+        desc:'国内手游推荐与社区平台，评分体系对独立游戏较友好。' },
+
+      /* ================= 社交媒体 ================= */
+      { id:'weibo', name:'微博', url:'https://weibo.com', icon:'🔴',
+        color:['#e6162d','#ff5c5c'], cat:'社交媒体', tags:['资讯','热点','社交'],
+        desc:'中文社交与信息传播平台，热点事件与实时讨论的集中地。' },
+      { id:'xiaohongshu', name:'小红书', url:'https://www.xiaohongshu.com', icon:'📕',
+        color:['#ff2442','#ff6b81'], cat:'社交媒体', tags:['种草','生活','笔记'],
+        desc:'生活方式分享社区，涵盖穿搭、旅行、数码与职场经验。' },
+      { id:'douyin', name:'抖音', url:'https://www.douyin.com', icon:'🎵',
+        color:['#000000','#25f4ee'], cat:'社交媒体', tags:['短视频','直播','算法'],
+        desc:'短视频平台，算法推荐精准，内容覆盖娱乐、知识与电商。' },
+      { id:'kuaishou', name:'快手', url:'https://www.kuaishou.com', icon:'⚡',
+        color:['#ff4906','#ff7a3d'], cat:'社交媒体', tags:['短视频','直播','老铁'],
+        desc:'短视频与直播平台，内容生态更贴近下沉市场与生活场景。' },
+      { id:'tiktok', name:'TikTok', url:'https://www.tiktok.com', icon:'🎶',
+        color:['#000000','#69c9d0'], cat:'社交媒体', tags:['短视频','国际','算法'],
+        desc:'抖音国际版，是全球短视频浪潮的主要推动者之一。' },
+      { id:'twitter', name:'X (Twitter)', url:'https://x.com', icon:'🐦',
+        color:['#0f1419','#3b3b3b'], cat:'社交媒体', tags:['国际','资讯','实时'],
+        desc:'全球实时信息平台，科技与设计圈的第一手动态常在这里发布。' },
+      { id:'facebook', name:'Facebook', url:'https://www.facebook.com', icon:'📘',
+        color:['#1877f2','#4a9aff'], cat:'社交媒体', tags:['社交','国际','Meta'],
+        desc:'全球最大的社交网络平台，连接朋友、群组与商家页面。' },
+      { id:'instagram', name:'Instagram', url:'https://www.instagram.com', icon:'📸',
+        color:['#e4405f','#f56b8a'], cat:'社交媒体', tags:['图片','短视频','潮流'],
+        desc:'以图片与短视频为主的社交平台，视觉内容与品牌营销重镇。' },
+      { id:'linkedin', name:'LinkedIn', url:'https://www.linkedin.com', icon:'💼',
+        color:['#0a66c2','#3b8fe0'], cat:'社交媒体', tags:['职场','招聘','人脉'],
+        desc:'职业社交平台，用于建立职业人脉、求职与行业内容分享。' },
+      { id:'reddit', name:'Reddit', url:'https://www.reddit.com', icon:'👽',
+        color:['#ff4500','#ff7043'], cat:'社交媒体', tags:['论坛','社区','讨论'],
+        desc:'兴趣驱动的国际社区，每个 Subreddit 都是一个垂直讨论区。' },
+      { id:'pinterest_social', name:'Pinterest', url:'https://www.pinterest.com', icon:'📌',
+        color:['#e60023','#ff4d6d'], cat:'社交媒体', tags:['图片','灵感','收藏'],
+        desc:'图片灵感平台，用户通过画板收藏与分享视觉内容。' },
+      { id:'snapchat', name:'Snapchat', url:'https://www.snapchat.com', icon:'👻',
+        color:['#fffc00','#ffe94d'], cat:'社交媒体', tags:['阅后即焚','年轻','滤镜'],
+        desc:'以阅后即焚与趣味滤镜著称的社交应用，用户偏年轻。' },
+      { id:'telegram', name:'Telegram', url:'https://telegram.org', icon:'✈️',
+        color:['#0088cc','#3bb0e8'], cat:'社交媒体', tags:['即时通讯','频道','加密'],
+        desc:'注重隐私与速度的即时通讯工具，频道与机器人生态活跃。' },
+      { id:'whatsapp', name:'WhatsApp', url:'https://www.whatsapp.com', icon:'💚',
+        color:['#25d366','#5ce68f'], cat:'社交媒体', tags:['即时通讯','国际','Meta'],
+        desc:'全球用户量极大的即时通讯应用，以手机号为基础。' },
+      { id:'signal', name:'Signal', url:'https://signal.org', icon:'🔒',
+        color:['#3a76f0','#6b9aff'], cat:'社交媒体', tags:['加密','隐私','开源'],
+        desc:'以端到端加密著称的通讯应用，注重隐私保护。' },
+      { id:'line', name:'LINE', url:'https://line.me', icon:'🟩',
+        color:['#06c755','#3dde85'], cat:'社交媒体', tags:['通讯','日本','贴纸'],
+        desc:'日本与东南亚流行的通讯应用，表情贴纸文化深入人心。' },
+      { id:'tieba', name:'百度贴吧', url:'https://tieba.baidu.com', icon:'🧷',
+        color:['#3385ff','#66a3ff'], cat:'社交媒体', tags:['论坛','兴趣','中文'],
+        desc:'基于关键词的兴趣社区，每个吧都是一个垂直讨论区。' },
+      { id:'douban_social', name:'豆瓣小组', url:'https://www.douban.com/group/', icon:'🌱',
+        color:['#007722','#2ea050'], cat:'社交媒体', tags:['小组','兴趣','讨论'],
+        desc:'豆瓣的兴趣小组，话题从读书电影到生活方式无所不包。' },
+      { id:'mastodon', name:'Mastodon', url:'https://joinmastodon.org', icon:'🐘',
+        color:['#6364ff','#8b8cff'], cat:'社交媒体', tags:['开源','去中心化','联邦'],
+        desc:'开源的去中心化社交网络，由众多独立实例组成联邦宇宙。' },
+      { id:'bluesky', name:'Bluesky', url:'https://bsky.app', icon:'🦋',
+        color:['#0085ff','#4aa9ff'], cat:'社交媒体', tags:['去中心化','社交','AT协议'],
+        desc:'基于 AT 协议的去中心化社交平台，界面接近早期 Twitter。' },
+      { id:'threads', name:'Threads', url:'https://www.threads.net', icon:'🧵',
+        color:['#000000','#4b5563'], cat:'社交媒体', tags:['Meta','文字','社交'],
+        desc:'Meta 推出的文字社交平台，与 Instagram 账号体系打通。' },
+      { id:'jike', name:'即刻', url:'https://okjike.com', icon:'🟡',
+        color:['#ffe411','#ffec66'], cat:'社交媒体', tags:['圈子','兴趣','年轻'],
+        desc:'兴趣圈子社区，氛围轻松，适合发现同好与新鲜话题。' },
+      { id:'zsxq', name:'知识星球', url:'https://www.zsxq.com', icon:'🪐',
+        color:['#3b82f6','#60a5fa'], cat:'社交媒体', tags:['社群','付费','创作者'],
+        desc:'创作者运营付费社群的工具，适合沉淀深度内容与成员互动。' },
+      { id:'v2ex_social', name:'V2EX 社区', url:'https://www.v2ex.com', icon:'🅥',
+        color:['#778087','#9aa5b1'], cat:'社交媒体', tags:['极客','讨论','节点'],
+        desc:'中文极客社区，按节点组织话题，技术与生活讨论并存。' },
+      { id:'maimai', name:'脉脉', url:'https://maimai.cn', icon:'💼',
+        color:['#1890ff','#4aa9ff'], cat:'社交媒体', tags:['职场','人脉','匿名'],
+        desc:'国内职场社交平台，用于拓展人脉与了解行业动态。' },
+      { id:'qq', name:'QQ', url:'https://im.qq.com', icon:'🐧',
+        color:['#12b7f5','#4acfff'], cat:'社交媒体', tags:['即时通讯','群组','年轻'],
+        desc:'国民级即时通讯工具，群组、文件传输与空间功能齐全。' },
+      { id:'wechat', name:'微信公众平台', url:'https://mp.weixin.qq.com', icon:'💚',
+        color:['#07c160','#4ade80'], cat:'社交媒体', tags:['公众号','内容','运营'],
+        desc:'微信公众号的内容管理与发布后台，中文内容创作者常用。' },
+      { id:'discord_social', name:'Discord 社区', url:'https://discord.com', icon:'🎮',
+        color:['#5865f2','#8b95ff'], cat:'社交媒体', tags:['社区','语音','服务器'],
+        desc:'以服务器与频道组织的社区平台，开源与游戏社群聚集地。' },
+      { id:'clubhouse', name:'Clubhouse', url:'https://www.clubhouse.com', icon:'🎙️',
+        color:['#f0e6d2','#d4c5a9'], cat:'社交媒体', tags:['语音','房间','社交'],
+        desc:'语音房间社交应用，曾引领实时音频社交的风潮。' },
+      { id:'tumblr', name:'Tumblr', url:'https://www.tumblr.com', icon:'📓',
+        color:['#36465d','#5a6b85'], cat:'社交媒体', tags:['博客','图片','亚文化'],
+        desc:'轻博客平台，以视觉内容与亚文化社群闻名。' }
+    ];
+
+    /* =========================================================
+       2. 工具函数
+       ========================================================= */
+    const $  = (sel, ctx) => (ctx || document).querySelector(sel);
+    const $$ = (sel, ctx) => Array.from((ctx || document).querySelectorAll(sel));
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, function (c) {
+        return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+      });
+    }
+
+    function highlight(text, q) {
+      const safe = escapeHtml(text);
+      const key = String(q || '').trim();
+      if (!key) return safe;
+      const re = new RegExp('(' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+      return safe.replace(re, '<mark>$1</mark>');
+    }
+
+    function searchSites(q) {
+      const key = String(q || '').trim().toLowerCase();
+      if (!key) return [];
+
+      const hits = [];
+      SITES.forEach(function (s) {
+        let sc = 0;
+        const name = s.name.toLowerCase();
+
+        if (name === key)                         sc += 200;
+        else if (name.startsWith(key))            sc += 120;
+        else if (name.indexOf(key) > -1)          sc += 80;
+
+        if (s.id.indexOf(key) > -1)               sc += 60;
+        if (s.tags.some(t => t.toLowerCase().indexOf(key) > -1)) sc += 40;
+        if (s.cat.toLowerCase().indexOf(key) > -1) sc += 30;
+        if (s.url.toLowerCase().indexOf(key) > -1) sc += 25;
+        if (s.desc.toLowerCase().indexOf(key) > -1) sc += 15;
+
+        if (sc > 0) hits.push({ site: s, score: sc });
+      });
+
+      hits.sort(function (a, b) {
+        return b.score - a.score || a.site.name.localeCompare(b.site.name, 'zh');
+      });
+
+      return hits.map(h => h.site);
+    }
+
+    function gradient(s) {
+      return 'linear-gradient(135deg, ' + s.color[0] + ', ' + s.color[1] + ')';
+    }
+
+    /** 渲染图标：有 img 用图片，没有则回退到 emoji 渐变块 */
+    function iconHTML(s, cls) {
+      if (s.img) {
+        return '' +
+          '<span class="' + cls + ' icon-box" style="background:#fff" aria-hidden="true">' +
+            '<img class="icon-img" src="' + s.img + '" alt="" loading="lazy" ' +
+                'onerror="this.parentNode.classList.remove(\'icon-box\');this.parentNode.innerHTML=\'' + 
+                (s.icon || '🔗') + '\';this.parentNode.style.background=\'linear-gradient(135deg, ' + 
+                s.color[0] + ', ' + s.color[1] + ')\';">' +
+          '</span>';
+      }
+      return '<span class="' + cls + '" style="background:' + gradient(s) + '" aria-hidden="true">' +
+            (s.icon || '🔗') + '</span>';
+    }
+
+    /* =========================================================
+       3. 渲染片段
+       ========================================================= */
+    function cardHTML(s) {
+      return '' +
+        '<a class="site-card reveal" href="#/site/' + encodeURIComponent(s.id) + '">' +
+          iconHTML(s, 'site-icon') +
+          '<span class="site-body">' +
+            '<span class="site-name">' + escapeHtml(s.name) + '</span>' +
+            '<span class="site-desc">' + escapeHtml(s.desc) + '</span>' +
+          '</span>' +
+        '</a>';
+    }
+
+    function resultRowHTML(s, q) {
+      return '' +
+        '<a class="result-row" href="#/site/' + encodeURIComponent(s.id) + '">' +
+          iconHTML(s, 'result-icon') +
+          '<span class="result-body">' +
+            '<span class="result-top">' +
+              '<span class="result-name">' + highlight(s.name, q) + '</span>' +
+              '<span class="result-cat">' + escapeHtml(s.cat) + '</span>' +
+            '</span>' +
+            '<span class="result-desc">' + highlight(s.desc, q) + '</span>' +
+          '</span>' +
+          '<span class="result-arrow" aria-hidden="true">↗</span>' +
+        '</a>';
+    }
+
+    /* =========================================================
+       4. 分类折叠
+       ========================================================= */
+    function firstRowHeight(grid) {
+      const cards = Array.from(grid.children).filter(function (el) {
+        return el.offsetParent !== null;
+      });
+      if (!cards.length) return 0;
+
+      const firstTop = cards[0].offsetTop;
+      let bottom = 0;
+
+      cards.forEach(function (c) {
+        if (Math.abs(c.offsetTop - firstTop) < 2) {
+          bottom = Math.max(bottom, c.offsetTop + c.offsetHeight);
+        }
+      });
+
+      return bottom - firstTop;
+    }
+
+    function revealHiddenCards(grid) {
+      Array.from(grid.children).forEach(function (c, i) {
+        if (!c.classList.contains('is-visible')) {
+          window.setTimeout(function () {
+            c.classList.add('is-visible');
+          }, Math.min(i, 12) * 30);
+        }
+      });
+    }
+
+    function initCollapsibles() {
+      $$('[data-collapsible]').forEach(function (grid) {
+        const section = grid.closest('.cat-section');
+        if (!section) return;
+        const btn = $('.cat-toggle', section);
+        if (!btn) return;
+
+        const rowH  = firstRowHeight(grid);
+        const fullH = grid.scrollHeight;
+
+        if (fullH <= rowH + 4) {
+          btn.hidden = true;
+          grid.classList.remove('is-collapsed');
+          grid.style.maxHeight = '';
+        } else {
+          btn.hidden = false;
+          grid.classList.add('is-collapsed');
+          grid.style.maxHeight = rowH + 'px';
+          btn.setAttribute('aria-expanded', 'false');
+          btn.innerHTML = '展开全部<span class="chev" aria-hidden="true">▾</span>';
+        }
+
+        btn.addEventListener('click', function () {
+          const collapsed = grid.classList.contains('is-collapsed');
+
+          if (collapsed) {
+            const h = grid.scrollHeight;
+            grid.style.maxHeight = h + 'px';
+            grid.classList.remove('is-collapsed');
+            btn.setAttribute('aria-expanded', 'true');
+            btn.innerHTML = '收起<span class="chev" aria-hidden="true">▾</span>';
+            revealHiddenCards(grid);
+          } else {
+            const rh = firstRowHeight(grid);
+            grid.style.maxHeight = rh + 'px';
+            grid.classList.add('is-collapsed');
+            btn.setAttribute('aria-expanded', 'false');
+            btn.innerHTML = '展开全部<span class="chev" aria-hidden="true">▾</span>';
+          }
+        });
+      });
+    }
+
+    let resizeTimer = null;
+    window.addEventListener('resize', function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function () {
+        $$('[data-collapsible]').forEach(function (grid) {
+          const section = grid.closest('.cat-section');
+          if (!section) return;
+          const btn = $('.cat-toggle', section);
+          if (!btn) return;
+
+          const rowH  = firstRowHeight(grid);
+          const fullH = grid.scrollHeight;
+
+          if (fullH <= rowH + 4) {
+            btn.hidden = true;
+            grid.classList.remove('is-collapsed');
+            grid.style.maxHeight = '';
+          } else {
+            btn.hidden = false;
+            if (grid.classList.contains('is-collapsed')) {
+              grid.style.maxHeight = rowH + 'px';
+            } else {
+              grid.style.maxHeight = fullH + 'px';
+            }
+          }
+        });
+      }, 150);
+    });
+
+    /* =========================================================
+       5. 视图渲染
+       ========================================================= */
+    const viewRoot = $('#viewRoot');
+
+    function renderHome() {
+      const grouped = {};
+      SITES.forEach(function (s) {
+        (grouped[s.cat] = grouped[s.cat] || []).push(s);
+      });
+
+      const cats = CATEGORY_ORDER.filter(c => grouped[c]);
+
+      let html = '' +
+        '<section class="home-hero">' +
+          '<div class="container">' +
+            '<p class="eyebrow">Cross & SAKANAthree</p>' +
+            '<h1>把官方网站都收在一个页面里，<br>让你不再误入盗版网站</h1>' +
+            '<p class="lead">按分类整理了 ' + SITES.length + ' 个常用网站，' +
+              '点击任意卡片即可查看简介与直达链接。每个分类都可以展开或收起，' +
+              '也可以直接在顶部搜索关键词。</p>' +
+            '<div class="cat-nav">' +
+              cats.map(function (c, i) {
+                return '<button class="cat-chip" type="button" data-target="cat-' + i + '">' +
+                         escapeHtml(c) + '<span>' + grouped[c].length + '</span>' +
+                       '</button>';
+              }).join('') +
+            '</div>' +
+          '</div>' +
+        '</section>';
+
+      html += cats.map(function (c, i) {
+        return '' +
+          '<section class="cat-section" id="cat-' + i + '">' +
+            '<div class="container">' +
+              '<div class="cat-section-head">' +
+                '<h2>' + escapeHtml(c) + '</h2>' +
+                '<div class="cat-head-right">' +
+                  '<span class="cat-count">' + grouped[c].length + ' 个网站</span>' +
+                  '<button class="cat-toggle" type="button" hidden aria-expanded="false">' +
+                    '展开全部<span class="chev" aria-hidden="true">▾</span>' +
+                  '</button>' +
+                '</div>' +
+              '</div>' +
+              '<div class="site-grid" data-collapsible>' +
+                grouped[c].map(cardHTML).join('') +
+              '</div>' +
+            '</div>' +
+          '</section>';
+      }).join('');
+
+      viewRoot.innerHTML = html;
+
+      $$('.cat-chip', viewRoot).forEach(function (chip) {
+        chip.addEventListener('click', function () {
+          const target = document.getElementById(chip.getAttribute('data-target'));
+          if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      });
+
+      $$('.site-grid', viewRoot).forEach(function (grid) {
+        Array.from(grid.children).forEach(function (el, i) {
+          el.style.transitionDelay = Math.min(i, 8) * 45 + 'ms';
+          el.addEventListener('transitionend', function handler(ev) {
+            if (ev.propertyName === 'opacity') {
+              el.style.transitionDelay = '';
+              el.removeEventListener('transitionend', handler);
+            }
+          });
+        });
+      });
+
+      observeReveals(viewRoot);
+      initCollapsibles();
+    }
+
+    function renderSearch(q) {
+      const results = searchSites(q);
+
+      let body;
+      if (results.length) {
+        body = '<div class="result-list">' +
+                 results.map(s => resultRowHTML(s, q)).join('') +
+               '</div>';
+      } else {
+        body = '' +
+          '<div class="empty-state">' +
+            '<div class="empty-icon" aria-hidden="true">🔍</div>' +
+            '<h3>没有找到相关网站</h3>' +
+            '<p>换个关键词试试，比如「设计」「AI」「Python」「视频」「文档」。</p>' +
+          '</div>';
+      }
+
+      viewRoot.innerHTML = '' +
+        '<section class="search-view">' +
+          '<div class="container">' +
+            '<a class="back-link" href="#/">← 返回首页</a>' +
+            '<div class="search-head">' +
+              '<h1>搜索结果</h1>' +
+              '<p class="search-meta">关键词 “<strong>' + escapeHtml(q) + '</strong>” · ' +
+                '共找到 <strong>' + results.length + '</strong> 个相关网站</p>' +
+            '</div>' +
+            body +
+          '</div>' +
+        '</section>';
+
+      const rows = $$('.result-row', viewRoot);
+      rows.forEach(function (row, i) {
+        window.setTimeout(function () {
+          row.classList.add('is-in');
+        }, 60 + i * 80);
+      });
+    }
+
+    function renderSite(id) {
+      const s = SITES.find(x => x.id === id);
+
+      if (!s) {
+        viewRoot.innerHTML = '' +
+          '<section class="search-view">' +
+            '<div class="container">' +
+              '<a class="back-link" href="#/">← 返回首页</a>' +
+              '<div class="empty-state">' +
+                '<div class="empty-icon" aria-hidden="true">🧭</div>' +
+                '<h3>找不到这个网站</h3>' +
+                '<p>它可能已被移除，或者链接输入有误。</p>' +
+              '</div>' +
+            '</div>' +
+          '</section>';
+        return;
+      }
+
+      const related = SITES
+        .filter(x => x.cat === s.cat && x.id !== s.id)
+        .slice(0, 4);
+
+      viewRoot.innerHTML = '' +
+        '<section class="detail-view">' +
+          '<div class="container">' +
+            '<a class="back-link" href="#/">← 返回首页</a>' +
+
+            '<article class="detail-card">' +
+              '<div class="detail-head">' +
+                iconHTML(s, 'detail-icon') +
+                '<div>' +
+                  '<h1>' + escapeHtml(s.name) + '</h1>' +
+                  '<div class="tag-list">' +
+                    '<span class="tag">' + escapeHtml(s.cat) + '</span>' +
+                    s.tags.map(t => '<span class="tag tag-soft">' + escapeHtml(t) + '</span>').join('') +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
+
+              '<p class="detail-desc">' + escapeHtml(s.desc) + '</p>' +
+
+              '<div class="detail-actions">' +
+                '<a class="btn btn-primary" href="' + escapeHtml(s.url) + '" ' +
+                   'target="_blank" rel="noopener noreferrer">访问网站 <span aria-hidden="true">↗</span></a>' +
+                '<button class="btn btn-ghost" id="copyBtn" type="button">复制链接</button>' +
+                '<span class="copy-tip" id="copyTip" role="status" aria-live="polite"></span>' +
+              '</div>' +
+
+              '<div class="detail-url">' + escapeHtml(s.url) + '</div>' +
+            '</article>' +
+
+            (related.length
+              ? '<section class="related">' +
+                  '<h2>同类网站</h2>' +
+                  '<div class="site-grid">' + related.map(cardHTML).join('') + '</div>' +
+                '</section>'
+              : '') +
+          '</div>' +
+        '</section>';
+
+      const copyBtn = $('#copyBtn', viewRoot);
+      const copyTip = $('#copyTip', viewRoot);
+
+      function showTip(msg) {
+        copyTip.textContent = msg;
+        copyTip.classList.add('is-show');
+        window.setTimeout(function () { copyTip.classList.remove('is-show'); }, 1800);
+      }
+
+      copyBtn.addEventListener('click', function () {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(s.url)
+            .then(function () { showTip('已复制'); })
+            .catch(function () { legacyCopy(s.url); });
+        } else {
+          legacyCopy(s.url);
+        }
+      });
+
+      function legacyCopy(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+          showTip('已复制');
+        } catch (err) {
+          showTip('复制失败，请手动复制');
+        }
+        ta.remove();
+      }
+
+      observeReveals(viewRoot);
+    }
+
+    /* =========================================================
+       6. 滚动入场观察器
+       ========================================================= */
+    const revealObserver = ('IntersectionObserver' in window)
+      ? new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('is-visible');
+              revealObserver.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.06, rootMargin: '0px 0px -40px 0px' })
+      : null;
+
+    function observeReveals(scope) {
+      const els = $$('.reveal', scope || document);
+      if (!revealObserver) {
+        els.forEach(el => el.classList.add('is-visible'));
+        return;
+      }
+      els.forEach(el => revealObserver.observe(el));
+    }
+
+    /* =========================================================
+       7. 路由
+       ========================================================= */
+    function route() {
+      const hash = location.hash.replace(/^#/, '') || '/';
+      closeSuggest();
+
+      if (hash.indexOf('/site/') === 0) {
+        renderSite(decodeURIComponent(hash.slice(6)));
+      } else if (hash.indexOf('/search/') === 0) {
+        const q = decodeURIComponent(hash.slice(8));
+        searchInput.value = q;
+        searchClear.hidden = !q;
+        renderSearch(q);
+      } else {
+        renderHome();
+      }
+
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+
+    window.addEventListener('hashchange', route);
+
+    /* =========================================================
+       8. 搜索交互
+       ========================================================= */
+    const searchForm   = $('#searchForm');
+    const searchInput  = $('#searchInput');
+    const searchClear  = $('#searchClear');
+    const suggestBox   = $('#suggest');
+
+    let suggestItems = [];
+    let activeIndex = -1;
+
+    function closeSuggest() {
+      suggestBox.hidden = true;
+      suggestBox.innerHTML = '';
+      suggestItems = [];
+      activeIndex = -1;
+      searchInput.setAttribute('aria-expanded', 'false');
+    }
+
+    function openSuggest(q) {
+      const list = searchSites(q).slice(0, 8);
+
+      if (!list.length) {
+        suggestBox.innerHTML = '<div class="suggest-empty">没有匹配的网站，按回车查看完整结果</div>';
+        suggestBox.hidden = false;
+        searchInput.setAttribute('aria-expanded', 'true');
+        suggestItems = [];
+        activeIndex = -1;
+        return;
+      }
+
+      suggestBox.innerHTML = list.map(function (s) {
+        return '' +
+          '<a class="suggest-item" role="option" href="#/site/' + encodeURIComponent(s.id) + '">' +
+            iconHTML(s, 'suggest-icon') +
+            '<span class="suggest-main">' +
+              '<span class="suggest-name">' + highlight(s.name, q) + '</span>' +
+              '<span class="suggest-cat">' + escapeHtml(s.cat) + '</span>' +
+            '</span>' +
+          '</a>';
+      }).join('');
+
+      suggestBox.hidden = false;
+      searchInput.setAttribute('aria-expanded', 'true');
+      suggestItems = $$('.suggest-item', suggestBox);
+      activeIndex = -1;
+    }
+
+    function setActive(i) {
+      if (!suggestItems.length) return;
+      if (i < 0) i = suggestItems.length - 1;
+      if (i >= suggestItems.length) i = 0;
+      activeIndex = i;
+      suggestItems.forEach(function (el, idx) {
+        const on = idx === i;
+        el.classList.toggle('is-active', on);
+        el.setAttribute('aria-selected', String(on));
+      });
+      suggestItems[i].scrollIntoView({ block: 'nearest' });
+    }
+
+    searchInput.addEventListener('input', function () {
+      const q = searchInput.value.trim();
+      searchClear.hidden = !q;
+      if (!q) { closeSuggest(); return; }
+      openSuggest(q);
+    });
+
+    searchInput.addEventListener('focus', function () {
+      const q = searchInput.value.trim();
+      if (q) openSuggest(q);
+    });
+
+    searchInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { closeSuggest(); return; }
+      if (suggestBox.hidden || !suggestItems.length) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActive(activeIndex + 1);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActive(activeIndex - 1);
+      } else if (e.key === 'Enter' && activeIndex >= 0) {
+        e.preventDefault();
+        location.hash = suggestItems[activeIndex].getAttribute('href');
+        closeSuggest();
+      }
+    });
+
+    searchForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const q = searchInput.value.trim();
+      if (!q) { searchInput.focus(); return; }
+
+      closeSuggest();
+
+      const target = '#/search/' + encodeURIComponent(q);
+      if (location.hash === target) {
+        renderSearch(q);
+        window.scrollTo({ top: 0, behavior: 'auto' });
+      } else {
+        location.hash = target;
+      }
+      searchInput.blur();
+    });
+
+    searchClear.addEventListener('click', function () {
+      searchInput.value = '';
+      searchClear.hidden = true;
+      closeSuggest();
+      searchInput.focus();
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('#searchBox')) closeSuggest();
+    });
+
+    suggestBox.addEventListener('click', function () {
+      closeSuggest();
+    });
+
+    /* =========================================================
+       9. 主题切换
+       ========================================================= */
+    const root = document.documentElement;
+    const themeToggle = $('#themeToggle');
+
+    function applyTheme(theme) {
+      root.setAttribute('data-theme', theme);
+      themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
+      themeToggle.setAttribute('aria-label',
+        theme === 'dark' ? '切换到浅色主题' : '切换到深色主题');
+      try { localStorage.setItem('nav-theme', theme); } catch (e) {}
+    }
+
+    applyTheme(root.getAttribute('data-theme') || 'light');
+
+    themeToggle.addEventListener('click', function () {
+      applyTheme(root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    });
+
+    /* =========================================================
+       10. 滚动阴影 + 年份 + 启动
+       ========================================================= */
+    const header = $('#siteHeader');
+    let ticking = false;
+
+    function onScroll() {
+      header.classList.toggle('is-scrolled', window.scrollY > 8);
+      ticking = false;
+    }
+
+    window.addEventListener('scroll', function () {
+      if (!ticking) {
+        ticking = true;
+        window.requestAnimationFrame(onScroll);
+      }
+    }, { passive: true });
+
+    onScroll();
+
+    $('#year').textContent = new Date().getFullYear();
+
+    route();
+  })();
+  </script>
+</body>
+</html>
